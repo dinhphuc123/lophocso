@@ -96,8 +96,16 @@ function GamesContent() {
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 text-xs">
-          {error}
+        <div className="p-3.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 text-xs flex items-center justify-between">
+          <span>{error}</span>
+          {error.includes("đề thi") && (
+            <Link
+              href="/teacher/exams/create"
+              className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] shrink-0 ml-2"
+            >
+              + Tạo đề thi mới
+            </Link>
+          )}
         </div>
       )}
 
@@ -258,8 +266,16 @@ function GamesContent() {
       <div className="space-y-3 pt-2">
         <label className="text-sm font-bold text-foreground">2. Chọn đề thi áp dụng:</label>
         {exams.length === 0 ? (
-          <div className="p-4 rounded-xl border border-dashed text-xs text-muted-foreground text-center">
-            Chưa có đề thi nào. Hãy tạo đề thi trước khi mở phòng game!
+          <div className="p-6 rounded-xl border border-dashed border-border bg-card text-xs text-muted-foreground text-center space-y-3">
+            <div>Chưa có đề thi nào trong hệ thống. Hãy tạo đề thi trước khi mở phòng game!</div>
+            <div>
+              <Link
+                href="/teacher/exams/create"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors"
+              >
+                + Tạo đề thi mới ngay
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto p-1">

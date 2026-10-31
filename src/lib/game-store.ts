@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { Exam, PublicQuestion, Question } from "./types";
-import { getExamById } from "./db";
+import { getExamWithFallback } from "./db";
 import { toPublicQuestion } from "./sanitize";
 import { matchShort } from "./grader";
 import { getGameRoomAdapter } from "./redis-adapter";
@@ -124,7 +124,7 @@ export function createRoomFromExam(exam: Exam, mode: GameMode): GameRoom {
 }
 
 export async function createGameRoom(examId: string, mode: GameMode): Promise<GameRoom> {
-  const exam = getExamById(examId);
+  const exam = await getExamWithFallback(examId);
   if (!exam) throw new Error("Không tìm thấy đề thi");
   const room = createRoomFromExam(exam, mode);
   room.pin = await generatePin();
