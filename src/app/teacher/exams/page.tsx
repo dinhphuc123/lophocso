@@ -22,7 +22,8 @@ import {
   X,
   CheckCircle2,
   QrCode,
-  Share2
+  Share2,
+  Edit3
 } from "lucide-react";
 import { Exam, ClassRoom } from "@/lib/types";
 
@@ -292,6 +293,15 @@ export default function ExamsListPage() {
                     <Copy className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>{copiedId === exam.id ? "Đã chép!" : "Link bài"}</span>
                   </button>
+
+                  <Link
+                    href={`/teacher/exams/${exam.id}/edit`}
+                    className="px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted text-xs font-semibold flex items-center gap-1 transition-colors text-foreground"
+                    title="Chỉnh sửa câu hỏi, đáp án đúng và thông tin đề thi"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Sửa đề</span>
+                  </Link>
 
                   <Link
                     href={`/teacher/exams/${exam.id}/matrix`}

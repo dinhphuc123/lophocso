@@ -14,9 +14,13 @@ import {
   BookOpen,
   Trophy,
   CheckCircle2,
-  Calendar
+  Calendar,
+  Edit,
+  FileUp,
+  Upload
 } from "lucide-react";
 import { ClassRoom } from "@/lib/types";
+import { parseStudentListFromFile } from "@/lib/excel-parser";
 
 interface GradebookSubmission {
   id: string;
@@ -44,6 +48,9 @@ export default function TeacherClassesPage() {
   const [grade, setGrade] = useState("12");
   const [studentsRaw, setStudentsRaw] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [excelStatus, setExcelStatus] = useState<string | null>(null);
+  const [isParsingExcel, setIsParsingExcel] = useState(false);
   const [supabaseNotice, setSupabaseNotice] = useState<{ message: string; sqlToRun?: string } | null>(null);
   const [sqlCopied, setSqlCopied] = useState(false);
 
@@ -102,6 +109,61 @@ export default function TeacherClassesPage() {
     }
   }, [activeTab]);
 
+  const handleOpenCreateModal = () => {
+    setEditingClassId(null);
+    setName("");
+    setGrade("12");
+    setStudentsRaw("");
+    setExcelStatus(null);
+    setShowModal(true);
+  };
+
+  const handleEditClass = (cls: ClassRoom) => {
+    setEditingClassId(cls.id);
+    setName(cls.name);
+    setGrade(cls.grade || "12");
+    setStudentsRaw((cls.students || []).join("\n"));
+    setExcelStatus(null);
+    setShowModal(true);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsingExcel(true);
+    setExcelStatus("Đang phân tích file Excel/CSV...");
+    try {
+      const names = await parseStudentListFromFile(file);
+      if (names.length === 0) {
+        setExcelStatus("Không tìm thấy danh sách tên học sinh trong file. Vui lòng kiểm tra cột có tiêu đề 'Họ và tên' hoặc 'Tên'.");
+      } else {
+        const existing = studentsRaw
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const combined = Array.from(new Set([...existing, ...names]));
+        setStudentsRaw(combined.join("\n"));
+        setExcelStatus(`Đã nhập thành công ${names.length} học sinh từ file "${file.name}"!`);
+        if (!name.trim()) {
+          const guessed = file.name
+            .replace(/\.[^/.]+$/, "")
+            .replace(/danh[-_\s]*sach[-_\s]*/i, "")
+            .trim();
+          if (guessed.length > 0 && guessed.length <= 15) {
+            setName(guessed.toUpperCase());
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Excel parse error:", err);
+      setExcelStatus("Lỗi đọc file. Thầy/Cô vui lòng dùng định dạng file .xlsx hoặc .csv chuẩn.");
+    } finally {
+      setIsParsingExcel(false);
+      e.target.value = "";
+    }
+  };
+
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -116,13 +178,20 @@ export default function TeacherClassesPage() {
       const res = await fetch("/api/classes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), grade, students: studentNames }),
+        body: JSON.stringify({ 
+          id: editingClassId || undefined, 
+          name: name.trim(), 
+          grade, 
+          students: studentNames 
+        }),
       });
       const data = await res.json();
       if (data.success) {
         setShowModal(false);
         setName("");
         setStudentsRaw("");
+        setEditingClassId(null);
+        setExcelStatus(null);
         if (data.warning) {
           setSupabaseNotice({ message: data.warning, sqlToRun: data.sqlToRun });
         } else {
@@ -130,7 +199,7 @@ export default function TeacherClassesPage() {
         }
         await fetchClasses();
       } else {
-        alert(data.error || "Không thể tạo lớp học");
+        alert(data.error || "Không thể lưu lớp học");
       }
     } catch {
       alert("Lỗi kết nối máy chủ");
@@ -288,7 +357,7 @@ export default function TeacherClassesPage() {
 
           {activeTab === "classes" && (
             <button
-              onClick={() => setShowModal(true)}
+              onClick={handleOpenCreateModal}
               className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
             >
               <Plus className="w-4 h-4" />
@@ -355,7 +424,7 @@ export default function TeacherClassesPage() {
                 </p>
               </div>
               <button
-                onClick={() => setShowModal(true)}
+                onClick={handleOpenCreateModal}
                 className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 cursor-pointer"
               >
                 Tạo lớp đầu tiên
@@ -389,32 +458,45 @@ export default function TeacherClassesPage() {
                     </p>
                   </div>
 
-                  <div className="pt-3 border-t border-border flex items-center justify-between gap-2">
-                    <button
-                      onClick={() => setSelectedClass(cls)}
-                      className="px-3 py-1.5 rounded-lg border border-border hover:bg-muted text-xs font-medium text-foreground cursor-pointer"
-                    >
-                      Xem danh sách
-                    </button>
+                  <div className="pt-3 border-t border-border flex flex-wrap items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setSelectedClass(cls)}
+                        className="px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted text-xs font-medium text-foreground cursor-pointer"
+                      >
+                        Xem danh sách
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        setSelectedGradebookClassId(cls.id);
-                        setActiveTab("gradebook");
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 hover:bg-blue-100 text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                    >
-                      <FileSpreadsheet className="w-3 h-3" />
-                      <span>Sổ điểm</span>
-                    </button>
+                      <button
+                        onClick={() => handleEditClass(cls)}
+                        className="px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted text-xs font-semibold text-foreground flex items-center gap-1 cursor-pointer"
+                        title="Sửa tên hoặc thêm học sinh từ Excel"
+                      >
+                        <Edit className="w-3 h-3 text-blue-600" />
+                        <span>Sửa / Thêm HS</span>
+                      </button>
+                    </div>
 
-                    <Link
-                      href={`/teacher/games`}
-                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center gap-1 shadow-2xs"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      <span>Đấu game</span>
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          setSelectedGradebookClassId(cls.id);
+                          setActiveTab("gradebook");
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 hover:bg-blue-100 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <FileSpreadsheet className="w-3 h-3" />
+                        <span>Sổ điểm</span>
+                      </button>
+
+                      <Link
+                        href={`/teacher/games`}
+                        className="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center gap-1 shadow-2xs"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Đấu game</span>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -545,13 +627,15 @@ export default function TeacherClassesPage() {
       )}
 
       {/* ========================================================= */}
-      {/* MODAL: THÊM LỚP HỌC MỚI                                   */}
+      {/* MODAL: THÊM / CHỈNH SỬA LỚP HỌC                          */}
       {/* ========================================================= */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-xl">
             <div className="flex items-center justify-between pb-3 border-b border-border">
-              <h3 className="font-bold text-base text-foreground">Thêm lớp học mới</h3>
+              <h3 className="font-bold text-base text-foreground">
+                {editingClassId ? "Chỉnh sửa lớp & Thêm học sinh" : "Thêm lớp học mới"}
+              </h3>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-xs font-semibold text-muted-foreground hover:text-foreground cursor-pointer"
@@ -588,18 +672,54 @@ export default function TeacherClassesPage() {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-foreground">Danh sách học sinh (Mỗi bạn 1 dòng)</label>
-                  <span className="text-[11px] text-muted-foreground">Có thể copy từ Excel/VnEdu</span>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <label className="text-xs font-bold text-foreground">
+                    Danh sách học sinh (Mỗi bạn 1 dòng)
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px] font-bold cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-2xs">
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{isParsingExcel ? "Đang đọc..." : "Nhập từ Excel (.xlsx / .csv)"}</span>
+                    <input
+                      type="file"
+                      accept=".xlsx, .xls, .csv, .txt"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      disabled={isParsingExcel}
+                    />
+                  </label>
                 </div>
+
+                {excelStatus && (
+                  <div
+                    className={`p-2 rounded-xl text-xs font-medium flex items-center gap-1.5 ${
+                      excelStatus.includes("thành công")
+                        ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800"
+                        : "bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200 border border-amber-200 dark:border-amber-800"
+                    }`}
+                  >
+                    <span>{excelStatus}</span>
+                  </div>
+                )}
+
                 <textarea
                   rows={6}
                   placeholder={`Nguyễn Văn An\nTrần Thị Bích\nLê Hoàng Nam\nPhạm Minh Châu`}
                   value={studentsRaw}
                   onChange={(e) => setStudentsRaw(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-border bg-background text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
+                  className="w-full p-3 rounded-xl border border-border bg-background text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed font-mono"
                 />
+
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                  <span>
+                    Tổng cộng:{" "}
+                    <strong className="text-foreground">
+                      {studentsRaw.split("\n").map((s) => s.trim()).filter(Boolean).length}
+                    </strong>{" "}
+                    học sinh
+                  </span>
+                  <span>Tự động nhận diện cột họ tên từ VnEdu, SMAS</span>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2">

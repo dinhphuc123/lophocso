@@ -94,7 +94,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params;
     const body = await req.json();
-    const { targetClass, durationMinutes, deadline, status, title } = body;
+    const { targetClass, durationMinutes, deadline, status, title, subject, questions } = body;
 
     let exam = getExamById(id);
     const supabase = getSupabase();
@@ -125,17 +125,22 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (deadline !== undefined) exam.deadline = deadline ? String(deadline) : undefined;
     if (status !== undefined) exam.status = status;
     if (title !== undefined) exam.title = String(title).trim();
+    if (subject !== undefined) exam.subject = String(subject).trim();
+    if (Array.isArray(questions)) exam.questions = questions;
 
     saveExam(exam);
 
     if (supabase) {
       const fullUpdate: Record<string, unknown> = {
         title: exam.title,
+        subject: exam.subject,
         target_class: exam.targetClass,
         duration_minutes: exam.durationMinutes,
         duration: exam.durationMinutes,
         deadline: exam.deadline || null,
         status: exam.status,
+        questions: exam.questions,
+        total_questions: exam.questions.length,
         description: `Lớp: ${exam.targetClass} | Thời lượng: ${exam.durationMinutes} phút`,
         updated_at: new Date().toISOString(),
       };
@@ -145,6 +150,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           title: exam.title,
           duration: exam.durationMinutes,
           status: exam.status,
+          questions: exam.questions,
+          total_questions: exam.questions.length,
           description: `Lớp: ${exam.targetClass} | Thời lượng: ${exam.durationMinutes} phút`,
           updated_at: new Date().toISOString(),
         };
