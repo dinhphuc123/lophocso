@@ -39,13 +39,23 @@ export async function GET(req: Request) {
           supabase.from("exams").select("id, title"),
         ]);
 
+        const localClasses = getClasses();
+        const localMap = new Map(localClasses.map((c) => [c.id, c]));
+        const localByName = new Map(localClasses.map((c) => [c.name.toLowerCase(), c]));
+
         if (cRes.data && Array.isArray(cRes.data)) {
-          classes = cRes.data.map((c: Record<string, unknown>) => ({
-            id: String(c.id),
-            name: String(c.name),
-            grade: c.grade ? String(c.grade) : undefined,
-            students: Array.isArray(c.students) ? (c.students as string[]) : [],
-          }));
+          classes = cRes.data.map((c: Record<string, unknown>) => {
+            const id = String(c.id);
+            const name = String(c.name || "");
+            const local = localMap.get(id) || localByName.get(name.toLowerCase());
+            const supaStudents = Array.isArray(c.students) && c.students.length > 0 ? (c.students as string[]) : null;
+            return {
+              id,
+              name,
+              grade: c.grade ? String(c.grade) : undefined,
+              students: supaStudents || local?.students || [],
+            };
+          });
         }
         if (sRes.data && Array.isArray(sRes.data)) {
           submissions = sRes.data.map((s: Record<string, unknown>) => ({
@@ -96,17 +106,27 @@ export async function GET(req: Request) {
     try {
       const { data, error } = await supabase.from("classes").select("*").order("created_at", { ascending: false });
       if (!error && data && Array.isArray(data)) {
-        const classes: ClassRoom[] = data.map((row: Record<string, unknown>) => ({
-          id: String(row.id),
-          name: String(row.name),
-          grade: row.grade ? String(row.grade) : undefined,
-          students: Array.isArray(row.students) ? (row.students as string[]) : [],
-        }));
+        const localClasses = getClasses();
+        const localMap = new Map(localClasses.map((c) => [c.id, c]));
+        const localByName = new Map(localClasses.map((c) => [c.name.toLowerCase(), c]));
+
+        const classes: ClassRoom[] = data.map((row: Record<string, unknown>) => {
+          const id = String(row.id);
+          const name = String(row.name || "");
+          const local = localMap.get(id) || localByName.get(name.toLowerCase());
+          const supaStudents = Array.isArray(row.students) && row.students.length > 0 ? (row.students as string[]) : null;
+          return {
+            id,
+            name,
+            grade: row.grade ? String(row.grade) : undefined,
+            students: supaStudents || local?.students || [],
+          };
+        });
 
         // Merge with any local classes not yet in Supabase
         const supabaseIds = new Set(classes.map((c) => c.id));
-        const localClasses = getClasses().filter((c) => !supabaseIds.has(c.id));
-        const merged = [...classes, ...localClasses];
+        const extraLocal = localClasses.filter((c) => !supabaseIds.has(c.id));
+        const merged = [...classes, ...extraLocal];
 
         return NextResponse.json({ success: true, classes: merged });
       }
@@ -154,8 +174,28 @@ export async function POST(req: Request) {
       const res1 = await supabase.from("classes").upsert(fullRecord);
       if (res1.error) {
         console.warn("Supabase classes upsert fullRecord failed, retrying with base columns:", res1.error);
+        const errMsg = res1.error.message || "";
+        const isMissingStudentsCol = 
+          errMsg.toLowerCase().includes("students") || 
+          errMsg.toLowerCase().includes("column") || 
+          errMsg.toLowerCase().includes("schema cache") ||
+          res1.error.code === "PGRST204";
+        const isRls = 
+          errMsg.toLowerCase().includes("row-level security") || 
+          errMsg.toLowerCase().includes("policy");
 
-        // 2. Fallback to base columns if students column is missing
+        if (isMissingStudentsCol) {
+          supabaseWarning = `Bảng 'classes' trên Supabase đang thiếu cột 'students' (JSONB). Danh sách ${newClass.students.length} học sinh hiện đã được lưu tạm trong trình duyệt và máy chủ. Để đồng bộ vĩnh viễn lên Supabase, Thầy/Cô vui lòng bấm sao chép và chạy lệnh SQL bên dưới vào Supabase SQL Editor.`;
+          sqlToRun = "ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS students JSONB DEFAULT '[]'::jsonb;\nALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;";
+        } else if (isRls) {
+          supabaseWarning = "Bảng 'classes' trên Supabase đang bật Row Level Security (RLS) chặn quyền ghi dữ liệu từ xa.";
+          sqlToRun = "ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;";
+        } else {
+          supabaseWarning = `Cảnh báo Supabase khi lưu học sinh: ${errMsg}`;
+          sqlToRun = "ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS students JSONB DEFAULT '[]'::jsonb;\nALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;";
+        }
+
+        // Fallback to base columns so at least the class row exists in Supabase
         const baseRecord = {
           id: newClass.id,
           name: newClass.name,
@@ -166,13 +206,6 @@ export async function POST(req: Request) {
         const res2 = await supabase.from("classes").upsert(baseRecord);
         if (res2.error) {
           console.error("Supabase classes upsert failed completely:", res2.error);
-          const isRls = res2.error.message.toLowerCase().includes("row-level security") || res2.error.message.toLowerCase().includes("policy");
-          if (isRls) {
-            supabaseWarning = "Lớp học đã được tạo thành công trên máy chủ! Tuy nhiên bảng 'classes' trên Supabase đang bật Row Level Security (RLS) chặn quyền ghi từ xa.";
-            sqlToRun = "ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;";
-          } else {
-            supabaseWarning = `Đã lưu lớp cục bộ. Lỗi Supabase: ${res2.error.message}`;
-          }
         }
       }
     } catch (e: unknown) {

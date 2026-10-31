@@ -67,9 +67,33 @@ export default function TeacherClassesPage() {
       const res = await fetch("/api/classes");
       const data = await res.json();
       if (data.success && data.classes) {
-        setClasses(data.classes);
-        if (!selectedGradebookClassId && data.classes.length > 0) {
-          setSelectedGradebookClassId(data.classes[0].id);
+        // Hydrate each class's students from localStorage if missing or empty
+        const hydrated = data.classes.map((cls: ClassRoom) => {
+          if (!cls.students || cls.students.length === 0) {
+            try {
+              const cached =
+                localStorage.getItem(`khaothiso_students_${cls.id}`) ||
+                localStorage.getItem(`khaothiso_students_name_${cls.name.toLowerCase()}`);
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  return { ...cls, students: parsed };
+                }
+              }
+            } catch {}
+          } else {
+            // Also store to localStorage for persistence
+            try {
+              localStorage.setItem(`khaothiso_students_${cls.id}`, JSON.stringify(cls.students));
+              localStorage.setItem(`khaothiso_students_name_${cls.name.toLowerCase()}`, JSON.stringify(cls.students));
+            } catch {}
+          }
+          return cls;
+        });
+
+        setClasses(hydrated);
+        if (!selectedGradebookClassId && hydrated.length > 0) {
+          setSelectedGradebookClassId(hydrated[0].id);
         }
       }
     } catch {
@@ -86,7 +110,25 @@ export default function TeacherClassesPage() {
       const res = await fetch("/api/classes?gradebook=true");
       const data = await res.json();
       if (data.success) {
-        if (data.classes) setClasses(data.classes);
+        if (data.classes) {
+          const hydrated = data.classes.map((cls: ClassRoom) => {
+            if (!cls.students || cls.students.length === 0) {
+              try {
+                const cached =
+                  localStorage.getItem(`khaothiso_students_${cls.id}`) ||
+                  localStorage.getItem(`khaothiso_students_name_${cls.name.toLowerCase()}`);
+                if (cached) {
+                  const parsed = JSON.parse(cached);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    return { ...cls, students: parsed };
+                  }
+                }
+              } catch {}
+            }
+            return cls;
+          });
+          setClasses(hydrated);
+        }
         if (data.submissions) setSubmissions(data.submissions);
         if (data.exams) setExams(data.exams);
         if (!selectedGradebookClassId && data.classes && data.classes.length > 0) {
@@ -197,6 +239,10 @@ export default function TeacherClassesPage() {
       if (data.success) {
         setSelectedClass(updatedClass);
         setClasses((prev) => prev.map((c) => (c.id === selectedClass.id ? updatedClass : c)));
+        try {
+          localStorage.setItem(`khaothiso_students_${selectedClass.id}`, JSON.stringify(updatedStudents));
+          localStorage.setItem(`khaothiso_students_name_${selectedClass.name.toLowerCase()}`, JSON.stringify(updatedStudents));
+        } catch {}
       } else {
         alert(data.error || "Không thể xóa học sinh");
       }
@@ -234,6 +280,10 @@ export default function TeacherClassesPage() {
         setQuickStudentName("");
         setSelectedClass(updatedClass);
         setClasses((prev) => prev.map((c) => (c.id === selectedClass.id ? updatedClass : c)));
+        try {
+          localStorage.setItem(`khaothiso_students_${selectedClass.id}`, JSON.stringify(updatedStudents));
+          localStorage.setItem(`khaothiso_students_name_${selectedClass.name.toLowerCase()}`, JSON.stringify(updatedStudents));
+        } catch {}
       } else {
         alert(data.error || "Không thể thêm học sinh");
       }
@@ -270,6 +320,16 @@ export default function TeacherClassesPage() {
         setStudentsRaw("");
         setEditingClassId(null);
         setExcelStatus(null);
+
+        // Always save to localStorage immediately so students never disappear
+        const targetId = editingClassId || data.class?.id;
+        if (targetId) {
+          try {
+            localStorage.setItem(`khaothiso_students_${targetId}`, JSON.stringify(studentNames));
+            localStorage.setItem(`khaothiso_students_name_${name.trim().toLowerCase()}`, JSON.stringify(studentNames));
+          } catch {}
+        }
+
         if (data.warning) {
           setSupabaseNotice({ message: data.warning, sqlToRun: data.sqlToRun });
         } else {
