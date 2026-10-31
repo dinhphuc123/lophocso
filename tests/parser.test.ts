@@ -51,3 +51,12 @@ test("real exam file: 22 questions, 6 figures attached, formulas keep exponents"
   assert.equal(unknownAnswers.length, 0);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test("parseDocxBuffer without uploadDir produces base64 data URIs for serverless compatibility", async () => {
+  const buf = fs.readFileSync(path.join(import.meta.dirname, "fixtures", "de-mau-7991.docx"));
+  const res = await parseDocxBuffer(buf);
+
+  assert.equal(res.questions.length, 22);
+  assert.equal(res.imageCount, 6);
+  assert.ok(res.questions.filter((q) => q.imageUrl).every((q) => q.imageUrl!.startsWith("data:image/")));
+});

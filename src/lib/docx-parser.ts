@@ -37,7 +37,7 @@ export async function parseDocxBuffer(
   opts: DocxParseOptions = {}
 ): Promise<DocxParseResult> {
   const zip = await JSZip.loadAsync(buffer);
-  const uploadDir = opts.uploadDir ?? path.join(process.cwd(), "public", "uploads");
+  const uploadDir = opts.uploadDir;
 
   const docFile = zip.file("word/document.xml");
   if (!docFile) throw new Error("Tệp không đúng định dạng Word .docx hợp lệ (thiếu document.xml)");
@@ -66,15 +66,25 @@ export async function parseDocxBuffer(
     const data = await file.async("uint8array");
     const ext = data.length <= MAX_IMAGE_BYTES ? sniffImageExt(data) : null;
     if (!ext) return undefined;
-    const name = `img_${createHash("sha256").update(data).digest("hex").slice(0, 16)}.${ext}`;
-    const target = path.join(uploadDir, name);
-    if (!fs.existsSync(target)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-      fs.writeFileSync(target, data);
-      createdNow.add(target);
+
+    // When an explicit uploadDir is provided (e.g. tests or custom local storage), write to disk
+    if (uploadDir) {
+      const name = `img_${createHash("sha256").update(data).digest("hex").slice(0, 16)}.${ext}`;
+      const target = path.join(uploadDir, name);
+      if (!fs.existsSync(target)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        fs.writeFileSync(target, data);
+        createdNow.add(target);
+      }
+      imageTotal++;
+      return (imageUrls[rId] = `/uploads/${name}`);
     }
+
+    // Default: Return Base64 Data URI (safe for Vercel Serverless / zero filesystem dependency)
+    const mime = ext === "jpg" ? "image/jpeg" : `image/${ext}`;
+    const base64 = Buffer.from(data).toString("base64");
     imageTotal++;
-    return (imageUrls[rId] = `/uploads/${name}`);
+    return (imageUrls[rId] = `data:${mime};base64,${base64}`);
   }
 
   // 3. paragraph by paragraph, in document order
