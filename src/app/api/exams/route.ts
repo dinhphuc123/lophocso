@@ -38,12 +38,12 @@ export async function GET(req: Request) {
           };
         });
 
-        // Also cache in local memory for offline fallback
-        for (const ex of exams) {
-          saveExam(ex);
-        }
+        // Merge any local cache exams not yet in Supabase
+        const supabaseIds = new Set(exams.map((e) => e.id));
+        const localExams = getExams().filter((e) => !supabaseIds.has(e.id));
+        const merged = [...exams, ...localExams];
 
-        return NextResponse.json({ success: true, exams });
+        return NextResponse.json({ success: true, exams: merged });
       } else if (error) {
         console.warn("Supabase getExams query error, falling back to local memory:", error);
       }
@@ -93,6 +93,9 @@ export async function POST(req: Request) {
       questions: parsedQuestions,
     };
 
+    saveExam(newExam); // Keep in local cache first so it's not lost
+
+    let supabaseError: string | null = null;
     const supabase = getSupabase();
     if (supabase) {
       // 1. Attempt insert with extended schema
@@ -115,9 +118,9 @@ export async function POST(req: Request) {
 
       const res1 = await supabase.from("exams").upsert(fullRecord);
       if (res1.error) {
-        console.warn("Supabase upsert with extended columns failed, falling back to base columns:", res1.error);
+        console.warn("Supabase upsert with full columns failed, retrying with base columns:", res1.error);
 
-        // 2. Fallback to base schema in case user didn't run ALTER TABLE
+        // 2. Fallback to base schema in case of missing columns
         const baseRecord: Record<string, unknown> = {
           id: newExam.id,
           title: newExam.title,
@@ -133,16 +136,29 @@ export async function POST(req: Request) {
 
         const res2 = await supabase.from("exams").upsert(baseRecord);
         if (res2.error) {
-          console.error("Supabase upsert with base columns also failed:", res2.error);
-          return NextResponse.json({
-            success: false,
-            error: `Lỗi Supabase: ${res2.error.message}. Vui lòng kiểm tra quyền RLS hoặc bảng exams trong Supabase.`,
-          }, { status: 500 });
+          console.error("Supabase upsert failed:", res2.error);
+          supabaseError = res2.error.message;
         }
       }
     }
 
-    saveExam(newExam);
+    if (supabaseError) {
+      const isRls = supabaseError.toLowerCase().includes("row-level security") || supabaseError.toLowerCase().includes("policy");
+      if (isRls) {
+        return NextResponse.json({
+          success: false,
+          error: "Bảng 'exams' trên Supabase đang bật Row Level Security (RLS) chặn quyền ghi của Anon Key. Thầy/Cô hãy vào Supabase SQL Editor và chạy lệnh: ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;",
+          sqlToRun: "ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY; ALTER TABLE public.submissions DISABLE ROW LEVEL SECURITY; ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;",
+          code: "RLS_VIOLATION",
+        }, { status: 403 });
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: `Lỗi Supabase: ${supabaseError}. Vui lòng kiểm tra quyền truy cập Supabase.`,
+      }, { status: 500 });
+    }
+
     return NextResponse.json({ success: true, exam: newExam });
   } catch (err: unknown) {
     const error = err instanceof Error ? err.message : String(err);

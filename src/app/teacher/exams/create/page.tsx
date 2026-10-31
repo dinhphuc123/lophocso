@@ -65,6 +65,8 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
   const [parsedQuestions, setParsedQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sqlCommand, setSqlCommand] = useState<string | null>(null);
+  const [sqlCopied, setSqlCopied] = useState(false);
 
   const handleFileUpload = async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".docx")) {
@@ -120,6 +122,7 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
   const handlePublish = async () => {
     setLoading(true);
     setError(null);
+    setSqlCommand(null);
     try {
       const qList = parsedQuestions.length > 0 ? parsedQuestions : parseExamText(rawText);
       if (qList.length === 0) {
@@ -142,6 +145,9 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
 
       const data = await res.json();
       if (!data.success) {
+        if (data.sqlToRun) {
+          setSqlCommand(data.sqlToRun);
+        }
         throw new Error(data.error || "Lỗi tạo đề thi");
       }
 
@@ -184,7 +190,35 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
         {error && (
           <div className="p-3.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 text-xs flex items-center gap-2 border border-rose-200 dark:border-rose-900">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+            <span className="whitespace-pre-line">{error}</span>
+          </div>
+        )}
+
+        {sqlCommand && (
+          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 space-y-2 text-xs">
+            <div className="font-bold text-amber-900 dark:text-amber-200">
+              Cách khắc phục: Mở quyền ghi Supabase (chỉ cần chạy 1 lần)
+            </div>
+            <p className="text-amber-800 dark:text-amber-300">
+              1. Vào trang quản trị <strong>Supabase Dashboard</strong> &gt; chọn Project &gt; mở <strong>SQL Editor</strong>.<br/>
+              2. Dán đoạn lệnh dưới đây và bấm <strong>Run</strong>:
+            </p>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+              <code className="flex-1 p-2.5 rounded-lg bg-black/10 dark:bg-black/40 font-mono text-[11px] overflow-x-auto text-foreground">
+                {sqlCommand}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(sqlCommand);
+                  setSqlCopied(true);
+                  setTimeout(() => setSqlCopied(false), 2000);
+                }}
+                className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-colors"
+              >
+                {sqlCopied ? "Đã sao chép!" : "Sao chép lệnh SQL"}
+              </button>
+            </div>
           </div>
         )}
 
