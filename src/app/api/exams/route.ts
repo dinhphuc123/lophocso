@@ -148,7 +148,7 @@ export async function POST(req: Request) {
         return NextResponse.json({
           success: false,
           error: "Bảng 'exams' trên Supabase đang bật Row Level Security (RLS) chặn quyền ghi của Anon Key. Thầy/Cô hãy vào Supabase SQL Editor và chạy lệnh: ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;",
-          sqlToRun: "ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY; ALTER TABLE public.submissions DISABLE ROW LEVEL SECURITY; ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;",
+          sqlToRun: "ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;",
           code: "RLS_VIOLATION",
         }, { status: 403 });
       }

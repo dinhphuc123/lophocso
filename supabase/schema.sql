@@ -1,5 +1,5 @@
 -- Schema Cơ sở dữ liệu Supabase cho Khảo Thí Số (KhaoThiSo)
--- Hỗ trợ cấu trúc đề thi BGD 2025 & Phòng game trực tiếp
+-- Hỗ trợ cấu trúc đề thi BGD 2025, phòng game trực tiếp & hồ sơ giáo viên
 
 -- 1. Bảng Đề thi (Exams)
 CREATE TABLE IF NOT EXISTS public.exams (
@@ -62,14 +62,6 @@ CREATE TABLE IF NOT EXISTS public.game_rooms (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Bật tính năng Realtime cho bảng game_rooms để đồng bộ trực tiếp máy chiếu & học sinh
-ALTER PUBLICATION supabase_realtime ADD TABLE public.game_rooms;
-
--- Tạo Indexes tăng tốc truy vấn phổ điểm & tìm kiếm
-CREATE INDEX IF NOT EXISTS idx_submissions_exam_id ON public.submissions(exam_id);
-CREATE INDEX IF NOT EXISTS idx_exams_created_at ON public.exams(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_game_rooms_state ON public.game_rooms(state);
-
 -- 5. Bảng Hồ sơ & Bảo mật Giáo viên (Teacher Profile)
 CREATE TABLE IF NOT EXISTS public.teacher_profile (
     id TEXT PRIMARY KEY DEFAULT 'default_teacher',
@@ -82,29 +74,31 @@ CREATE TABLE IF NOT EXISTS public.teacher_profile (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. Tắt RLS hoặc phân quyền truy cập cho Anon / Service Key (Tránh lỗi RLS policy violation)
-ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.submissions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.game_rooms DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.teacher_profile DISABLE ROW LEVEL SECURITY;
-
--- Cấp quyền đầy đủ cho vai trò anon và authenticated (phòng khi người dùng bật RLS thủ công)
+-- 6. Tắt RLS an toàn (Kiểm tra từng bảng trước khi tắt, không bao giờ báo lỗi bảng chưa tồn tại)
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'exams') THEN
+    ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;
     GRANT ALL ON TABLE public.exams TO anon, authenticated, service_role;
   END IF;
+
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'classes') THEN
+    ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;
     GRANT ALL ON TABLE public.classes TO anon, authenticated, service_role;
   END IF;
+
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'submissions') THEN
+    ALTER TABLE public.submissions DISABLE ROW LEVEL SECURITY;
     GRANT ALL ON TABLE public.submissions TO anon, authenticated, service_role;
   END IF;
+
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'game_rooms') THEN
+    ALTER TABLE public.game_rooms DISABLE ROW LEVEL SECURITY;
     GRANT ALL ON TABLE public.game_rooms TO anon, authenticated, service_role;
   END IF;
+
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'teacher_profile') THEN
+    ALTER TABLE public.teacher_profile DISABLE ROW LEVEL SECURITY;
     GRANT ALL ON TABLE public.teacher_profile TO anon, authenticated, service_role;
   END IF;
 END $$;
