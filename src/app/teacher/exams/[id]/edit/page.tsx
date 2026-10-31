@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Exam, Question, MultipleChoiceQuestion, TrueFalseQuestion, ShortAnswerQuestion } from "@/lib/types";
 import { MathText } from "@/components/MathText";
+import { SqlFixModal } from "@/components/SqlFixModal";
 
 export default function ExamEditPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -31,6 +32,7 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showSqlModal, setShowSqlModal] = useState(false);
 
   // Form fields
   const [title, setTitle] = useState("");
@@ -309,10 +311,25 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
         </div>
       )}
 
+      {showSqlModal && <SqlFixModal onClose={() => setShowSqlModal(false)} />}
+
       {errorMessage && (
-        <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs font-semibold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-          <span>{errorMessage}</span>
+        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs font-semibold flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-2">
+            <span className="whitespace-pre-line">{errorMessage}</span>
+            {(errorMessage.toLowerCase().includes("rls") ||
+              errorMessage.toLowerCase().includes("row-level") ||
+              errorMessage.toLowerCase().includes("policy")) && (
+              <button
+                type="button"
+                onClick={() => setShowSqlModal(true)}
+                className="block px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer transition-colors"
+              >
+                Xem cách khắc phục (SQL)
+              </button>
+            )}
+          </div>
         </div>
       )}
 

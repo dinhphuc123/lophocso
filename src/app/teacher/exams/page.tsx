@@ -27,6 +27,7 @@ import {
   Activity
 } from "lucide-react";
 import { Exam, ClassRoom } from "@/lib/types";
+import { SqlFixModal } from "@/components/SqlFixModal";
 
 interface ShareData {
   exam: Exam;
@@ -56,6 +57,7 @@ export default function ExamsListPage() {
   const [shareData, setShareData] = useState<ShareData | null>(null);
   const [zaloCopied, setZaloCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showSqlModal, setShowSqlModal] = useState(false);
 
   const fetchExams = () => {
     fetch("/api/exams")
@@ -149,7 +151,14 @@ export default function ExamsListPage() {
         setAssigningExam(null);
         setShareData(assignedInfo);
       } else {
-        alert(data.error || "Không thể giao đề thi");
+        const isRls = (data.error || "").toLowerCase().includes("rls") ||
+          (data.error || "").toLowerCase().includes("row-level") ||
+          (data.error || "").toLowerCase().includes("policy");
+        if (isRls) {
+          setShowSqlModal(true);
+        } else {
+          alert(data.error || "Không thể giao đề thi");
+        }
       }
     } catch {
       alert("Lỗi kết nối máy chủ");
@@ -186,6 +195,7 @@ export default function ExamsListPage() {
 
   return (
     <div className="space-y-6 pb-12">
+      {showSqlModal && <SqlFixModal onClose={() => setShowSqlModal(false)} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
