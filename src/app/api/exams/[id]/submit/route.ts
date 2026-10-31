@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAttempt, getExamById, saveSubmission } from "@/lib/db";
+import { getAttempt, getExamWithFallback, saveSubmission } from "@/lib/db";
 import { gradeSubmission } from "@/lib/grader";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { getSupabase } from "@/lib/supabase";
@@ -12,7 +12,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ success: false, error: "Quá nhiều yêu cầu, thử lại sau" }, { status: 429 });
     }
     const { id } = await params;
-    const exam = getExamById(id);
+    const exam = await getExamWithFallback(id);
     if (!exam) {
       return NextResponse.json({ success: false, error: "Đề thi không tồn tại" }, { status: 404 });
     }

@@ -3,18 +3,32 @@
 import { useState } from "react";
 import { X, Copy, CheckCircle2, ExternalLink, Database } from "lucide-react";
 
-const FULL_SQL = `-- Mở quyền ghi cho tất cả bảng (chạy 1 lần duy nhất)
+const FULL_SQL = `-- 1. Bảng lưu hồ sơ & mật khẩu giáo viên
+CREATE TABLE IF NOT EXISTS public.teacher_profile (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  school TEXT,
+  subject TEXT,
+  email TEXT,
+  password_hash TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Thêm cột students cho lớp học nếu chưa có
+ALTER TABLE public.classes
+  ADD COLUMN IF NOT EXISTS students JSONB DEFAULT '[]'::jsonb;
+
+-- 3. Mở quyền ghi (Disable RLS) cho tất cả các bảng
 ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.submissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_profile DISABLE ROW LEVEL SECURITY;
 
+-- 4. Cấp toàn quyền truy cập (Anon Key)
 GRANT ALL ON TABLE public.exams TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.classes TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.submissions TO anon, authenticated, service_role;
-
--- Thêm cột students nếu chưa có
-ALTER TABLE public.classes
-  ADD COLUMN IF NOT EXISTS students JSONB DEFAULT '[]'::jsonb;`;
+GRANT ALL ON TABLE public.teacher_profile TO anon, authenticated, service_role;`;
 
 interface SqlFixModalProps {
   onClose: () => void;

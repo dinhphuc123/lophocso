@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getExamById, startAttempt } from "@/lib/db";
+import { getExamWithFallback, startAttempt } from "@/lib/db";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 /** Student starts (or resumes) an attempt; the server records the start time. */
@@ -8,7 +8,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ success: false, error: "Quá nhiều yêu cầu, thử lại sau" }, { status: 429 });
   }
   const { id } = await params;
-  const exam = getExamById(id);
+  const exam = await getExamWithFallback(id);
   if (!exam || exam.status === "draft" || exam.status === "closed") {
     return NextResponse.json({ success: false, error: "Đề thi chưa mở hoặc đã đóng" }, { status: 403 });
   }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getExamById, deleteExam, saveExam } from "@/lib/db";
+import { getExamWithFallback, deleteExam, saveExam } from "@/lib/db";
 import { isTeacher, teacherOnly } from "@/lib/auth";
 import { toPublicExam } from "@/lib/sanitize";
 import { shuffleExam } from "@/lib/shuffler";
@@ -11,40 +11,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const { id } = await params;
     const code = new URL(req.url).searchParams.get("code");
-    let exam: Exam | undefined;
-
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.from("exams").select("*").eq("id", id).maybeSingle();
-        if (!error && data) {
-          let targetClass = String(data.target_class || "");
-          if (!targetClass && typeof data.description === "string" && data.description.includes("Lớp: ")) {
-            targetClass = data.description.split("|")[0].replace("Lớp: ", "").trim();
-          }
-          if (!targetClass) targetClass = "Toàn trường";
-
-          exam = {
-            id: String(data.id),
-            title: String(data.title),
-            subject: String(data.subject || "Toán học"),
-            targetClass,
-            durationMinutes: Number(data.duration_minutes || data.duration) || 45,
-            deadline: data.deadline ? String(data.deadline) : undefined,
-            status: (data.status as Exam["status"]) || "open",
-            createdAt: String(data.created_at || new Date().toISOString()),
-            questions: Array.isArray(data.questions) ? (data.questions as Exam["questions"]) : [],
-          };
-          saveExam(exam); // Cache in memory
-        }
-      } catch (err) {
-        console.warn("Supabase getExamById error:", err);
-      }
-    }
-
-    if (!exam) {
-      exam = getExamById(id);
-    }
+    let exam = await getExamWithFallback(id);
 
     if (!exam) {
       return NextResponse.json({ success: false, error: "Không tìm thấy đề thi" }, { status: 404 });
@@ -96,25 +63,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json();
     const { targetClass, durationMinutes, deadline, status, title, subject, questions } = body;
 
-    let exam = getExamById(id);
+    let exam = await getExamWithFallback(id);
     const supabase = getSupabase();
-
-    if (!exam && supabase) {
-      const { data } = await supabase.from("exams").select("*").eq("id", id).maybeSingle();
-      if (data) {
-        exam = {
-          id: String(data.id),
-          title: String(data.title),
-          subject: String(data.subject || "Toán học"),
-          targetClass: String(data.target_class || "Toàn trường"),
-          durationMinutes: Number(data.duration_minutes || data.duration) || 45,
-          deadline: data.deadline ? String(data.deadline) : undefined,
-          status: (data.status as Exam["status"]) || "open",
-          createdAt: String(data.created_at || new Date().toISOString()),
-          questions: Array.isArray(data.questions) ? (data.questions as Exam["questions"]) : [],
-        };
-      }
-    }
 
     if (!exam) {
       return NextResponse.json({ success: false, error: "Không tìm thấy đề thi" }, { status: 404 });

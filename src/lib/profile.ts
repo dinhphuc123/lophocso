@@ -1,4 +1,9 @@
+import fs from "node:fs";
+import path from "node:path";
 import { getSupabase } from "./supabase";
+
+const DATA_DIR = process.env.VERCEL ? path.join("/tmp", "data") : path.join(process.cwd(), "data");
+const PROFILE_FILE = path.join(DATA_DIR, "profile.json");
 
 export interface TeacherProfile {
   id: string;
@@ -10,8 +15,28 @@ export interface TeacherProfile {
   updatedAt: string;
 }
 
-// In-memory cache for fast access across serverless invocations
-let cachedProfile: TeacherProfile = {
+function loadDiskProfile(): TeacherProfile | null {
+  try {
+    if (fs.existsSync(PROFILE_FILE)) {
+      return JSON.parse(fs.readFileSync(PROFILE_FILE, "utf-8")) as TeacherProfile;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function saveDiskProfile(p: TeacherProfile): void {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(PROFILE_FILE, JSON.stringify(p, null, 2), "utf-8");
+  } catch {
+    // ignore
+  }
+}
+
+// In-memory cache with disk fallback
+let cachedProfile: TeacherProfile = loadDiskProfile() || {
   id: "default_teacher",
   name: "Thầy/Cô Giáo",
   school: "Trường THPT",
@@ -65,6 +90,8 @@ export async function updateTeacherProfile(updates: Partial<TeacherProfile>): Pr
     ...updates,
     updatedAt: new Date().toISOString(),
   };
+
+  saveDiskProfile(cachedProfile);
 
   const supabase = getSupabase();
   if (supabase) {

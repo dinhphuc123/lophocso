@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { startAttempt, recordHeartbeat, getActiveAttempts, saveSubmission } from "../src/lib/db";
-import { StudentSubmission } from "../src/lib/types";
+import { startAttempt, recordHeartbeat, getActiveAttempts, saveSubmission, saveExam, getExamWithFallback } from "../src/lib/db";
+import { StudentSubmission, Exam } from "../src/lib/types";
 
 test("attempts: starts an attempt and lists in getActiveAttempts", () => {
   const examId = `exam-test-${Date.now()}`;
@@ -61,4 +61,24 @@ test("attempts: removes from active attempts once submitted", () => {
   saveSubmission(sub);
   const activeAfter = getActiveAttempts(examId);
   assert.equal(activeAfter.some((a) => a.studentName === studentName), false);
+});
+
+test("getExamWithFallback: finds exam in memory cache", async () => {
+  const examId = `exam-cache-${Date.now()}`;
+  const mockExam: Exam = {
+    id: examId,
+    title: "Đề kiểm tra bộ nhớ đệm",
+    subject: "Toán 12",
+    targetClass: "12A1",
+    durationMinutes: 45,
+    status: "open",
+    createdAt: new Date().toISOString(),
+    questions: [],
+  };
+
+  saveExam(mockExam);
+  const found = await getExamWithFallback(examId);
+  assert.ok(found);
+  assert.equal(found.id, examId);
+  assert.equal(found.title, mockExam.title);
 });

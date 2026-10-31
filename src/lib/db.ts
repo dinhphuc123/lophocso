@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Attempt, ClassRoom, Exam, StudentSubmission, DashboardStats } from "./types";
+import { getSupabase } from "./supabase";
+
+if (process.env.VERCEL && !getSupabase()) {
+  console.warn("[WARNING] Đang chạy trên Vercel nhưng chưa cấu hình SUPABASE_URL / SUPABASE_ANON_KEY. Dữ liệu trong /tmp sẽ bị mất khi function restart!");
+}
 
 const DATA_DIR = process.env.VERCEL ? path.join("/tmp", "data") : path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
@@ -50,6 +55,42 @@ export function getExams(): Exam[] {
 
 export function getExamById(id: string): Exam | undefined {
   return readDb().exams.find((e) => e.id === id);
+}
+
+export async function getExamWithFallback(id: string): Promise<Exam | undefined> {
+  const local = getExamById(id);
+  if (local) return local;
+
+  const supabase = getSupabase();
+  if (!supabase) return undefined;
+
+  try {
+    const { data, error } = await supabase.from("exams").select("*").eq("id", id).maybeSingle();
+    if (!error && data) {
+      let targetClass = String(data.target_class || "");
+      if (!targetClass && typeof data.description === "string" && data.description.includes("Lớp: ")) {
+        targetClass = data.description.split("|")[0].replace("Lớp: ", "").trim();
+      }
+      if (!targetClass) targetClass = "Toàn trường";
+
+      const exam: Exam = {
+        id: String(data.id),
+        title: String(data.title),
+        subject: String(data.subject || "Toán học"),
+        targetClass,
+        durationMinutes: Number(data.duration_minutes || data.duration) || 45,
+        deadline: data.deadline ? String(data.deadline) : undefined,
+        status: (data.status as Exam["status"]) || "open",
+        createdAt: String(data.created_at || new Date().toISOString()),
+        questions: Array.isArray(data.questions) ? (data.questions as Exam["questions"]) : [],
+      };
+      saveExam(exam);
+      return exam;
+    }
+  } catch (err) {
+    console.warn("getExamWithFallback error:", err);
+  }
+  return undefined;
 }
 
 export function saveExam(exam: Exam): Exam {

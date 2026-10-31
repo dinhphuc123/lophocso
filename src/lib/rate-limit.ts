@@ -17,6 +17,16 @@ export function rateLimit(key: string, max: number, windowMs: number): boolean {
   return true;
 }
 
+/** Periodic cleanup: remove stale keys to avoid slow memory leaks */
+export function pruneRateLimits(windowMs = 60_000): void {
+  const now = Date.now();
+  for (const [k, timestamps] of hits.entries()) {
+    const valid = timestamps.filter((t) => now - t < windowMs);
+    if (valid.length === 0) hits.delete(k);
+    else hits.set(k, valid);
+  }
+}
+
 export function clientIp(req: Request): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";
 }
