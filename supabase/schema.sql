@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS public.exams (
     title TEXT NOT NULL,
     description TEXT,
     duration INTEGER DEFAULT 45,
+    duration_minutes INTEGER DEFAULT 45,
+    target_class TEXT DEFAULT 'Toàn trường',
+    deadline TEXT,
     total_questions INTEGER DEFAULT 0,
     status TEXT DEFAULT 'draft',
     subject TEXT DEFAULT 'Toán',
@@ -15,6 +18,9 @@ CREATE TABLE IF NOT EXISTS public.exams (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS target_class TEXT DEFAULT 'Toàn trường';
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS duration_minutes INTEGER DEFAULT 45;
+ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS deadline TEXT;
 
 -- 2. Bảng Lớp học (Classes)
 CREATE TABLE IF NOT EXISTS public.classes (

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAttempt, getExamById, saveSubmission } from "@/lib/db";
 import { gradeSubmission } from "@/lib/grader";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { getSupabase } from "@/lib/supabase";
 
 const GRACE_MS = 60_000; // network + auto-submit slack
 
@@ -37,6 +38,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const clean = answers && typeof answers === "object" && !Array.isArray(answers) ? answers : {};
     const submission = gradeSubmission(exam, attempt.studentName, attempt.studentClass || "Tự do", clean, attempt.startedAt);
     saveSubmission(submission);
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from("submissions").upsert({
+          id: submission.id,
+          exam_id: submission.examId,
+          student_name: submission.studentName,
+          class_name: submission.studentClass,
+          score: submission.score,
+          total_score: submission.totalScore,
+          answers: submission.answers,
+          details: submission.details,
+          started_at: submission.startedAt,
+          submitted_at: submission.submittedAt,
+        });
+      } catch (err) {
+        console.error("Supabase saveSubmission error:", err);
+      }
+    }
 
     return NextResponse.json({ success: true, submission });
   } catch (err: unknown) {

@@ -10,12 +10,21 @@ function GamesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedExamId = searchParams.get("examId");
+  const modeParam = searchParams.get("mode") as "arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance" | null;
 
   const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string>(preselectedExamId || "");
-  const [selectedMode, setSelectedMode] = useState<"arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance">("race");
+  const [selectedMode, setSelectedMode] = useState<"arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance">(
+    modeParam && ["arena", "bomb", "farm", "race", "golden_bell", "dance"].includes(modeParam) ? modeParam : "race"
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (modeParam && ["arena", "bomb", "farm", "race", "golden_bell", "dance"].includes(modeParam)) {
+      setSelectedMode(modeParam);
+    }
+  }, [modeParam]);
 
   useEffect(() => {
     fetch("/api/exams")
