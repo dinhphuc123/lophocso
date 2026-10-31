@@ -44,6 +44,8 @@ export default function TeacherClassesPage() {
   const [grade, setGrade] = useState("12");
   const [studentsRaw, setStudentsRaw] = useState("");
   const [saving, setSaving] = useState(false);
+  const [supabaseNotice, setSupabaseNotice] = useState<{ message: string; sqlToRun?: string } | null>(null);
+  const [sqlCopied, setSqlCopied] = useState(false);
 
   // Gradebook state
   const [selectedGradebookClassId, setSelectedGradebookClassId] = useState<string>("");
@@ -121,6 +123,11 @@ export default function TeacherClassesPage() {
         setShowModal(false);
         setName("");
         setStudentsRaw("");
+        if (data.warning) {
+          setSupabaseNotice({ message: data.warning, sqlToRun: data.sqlToRun });
+        } else {
+          setSupabaseNotice(null);
+        }
         await fetchClasses();
       } else {
         alert(data.error || "Không thể tạo lớp học");
@@ -290,6 +297,46 @@ export default function TeacherClassesPage() {
           )}
         </div>
       </div>
+
+      {/* Supabase RLS Notice if detected */}
+      {supabaseNotice && (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-amber-900 dark:text-amber-200">
+              {supabaseNotice.message}
+            </span>
+            <button
+              onClick={() => setSupabaseNotice(null)}
+              className="text-muted-foreground hover:text-foreground text-xs p-1"
+            >
+              ✕
+            </button>
+          </div>
+          {supabaseNotice.sqlToRun && (
+            <div className="space-y-1.5 pt-1">
+              <p className="text-amber-800 dark:text-amber-300">
+                Chạy dòng lệnh này trong Supabase SQL Editor để mở quyền lưu trực tuyến:
+              </p>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <code className="flex-1 p-2 rounded-lg bg-black/10 dark:bg-black/40 font-mono text-[11px] overflow-x-auto text-foreground">
+                  {supabaseNotice.sqlToRun}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(supabaseNotice.sqlToRun || "");
+                    setSqlCopied(true);
+                    setTimeout(() => setSqlCopied(false), 2000);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-colors"
+                >
+                  {sqlCopied ? "Đã chép!" : "Sao chép lệnh SQL"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* TAB 1: DANH SÁCH LỚP HỌC                                 */}
