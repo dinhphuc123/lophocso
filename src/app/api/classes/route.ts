@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { deleteClass, getClasses, saveClass } from "@/lib/db";
+import { deleteClass, getClasses, saveClass, getSubmissions, getExams } from "@/lib/db";
 import { teacherOnly } from "@/lib/auth";
+import { getSupabase } from "@/lib/supabase";
+import { ClassRoom } from "@/lib/types";
 
 const parseStudents = (v: unknown): string[] =>
   (Array.isArray(v) ? v : String(v ?? "").split(/\r?\n/))
@@ -11,25 +13,154 @@ const parseStudents = (v: unknown): string[] =>
 export async function GET(req: Request) {
   const denied = await teacherOnly(req);
   if (denied) return denied;
+
+  const url = new URL(req.url);
+  const gradebook = url.searchParams.get("gradebook");
+  const supabase = getSupabase();
+
+  // 1. Sổ điểm: Trả về danh sách lớp kèm bài nộp để tổng hợp
+  if (gradebook === "true") {
+    let classes: ClassRoom[] = [];
+    let submissions: Array<{
+      id: string;
+      examId: string;
+      studentName: string;
+      studentClass?: string;
+      score: number;
+      submittedAt: string;
+    }> = [];
+    let exams: Array<{ id: string; title: string }> = [];
+
+    if (supabase) {
+      try {
+        const [cRes, sRes, eRes] = await Promise.all([
+          supabase.from("classes").select("*").order("name"),
+          supabase.from("submissions").select("id, exam_id, student_name, class_name, score, submitted_at"),
+          supabase.from("exams").select("id, title"),
+        ]);
+
+        if (cRes.data) {
+          classes = cRes.data.map((c: Record<string, unknown>) => ({
+            id: String(c.id),
+            name: String(c.name),
+            grade: c.grade ? String(c.grade) : undefined,
+            students: Array.isArray(c.students) ? (c.students as string[]) : [],
+          }));
+        }
+        if (sRes.data) {
+          submissions = sRes.data.map((s: Record<string, unknown>) => ({
+            id: String(s.id),
+            examId: String(s.exam_id),
+            studentName: String(s.student_name),
+            studentClass: s.class_name ? String(s.class_name) : undefined,
+            score: Number(s.score) || 0,
+            submittedAt: String(s.submitted_at || new Date().toISOString()),
+          }));
+        }
+        if (eRes.data) {
+          exams = eRes.data.map((e: Record<string, unknown>) => ({
+            id: String(e.id),
+            title: String(e.title),
+          }));
+        }
+      } catch (err) {
+        console.warn("Supabase gradebook query error:", err);
+      }
+    }
+
+    // Fallback if supabase has no rows yet or offline
+    if (classes.length === 0) classes = getClasses();
+    if (submissions.length === 0) {
+      submissions = getSubmissions().map((s) => ({
+        id: s.id,
+        examId: s.examId,
+        studentName: s.studentName,
+        studentClass: s.studentClass,
+        score: s.score,
+        submittedAt: s.submittedAt,
+      }));
+    }
+    if (exams.length === 0) {
+      exams = getExams().map((e) => ({ id: e.id, title: e.title }));
+    }
+
+    return NextResponse.json({ success: true, classes, submissions, exams });
+  }
+
+  // 2. Danh sách lớp thông thường
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from("classes").select("*").order("created_at", { ascending: false });
+      if (!error && data) {
+        const classes: ClassRoom[] = data.map((row: Record<string, unknown>) => ({
+          id: String(row.id),
+          name: String(row.name),
+          grade: row.grade ? String(row.grade) : undefined,
+          students: Array.isArray(row.students) ? (row.students as string[]) : [],
+        }));
+        return NextResponse.json({ success: true, classes });
+      }
+    } catch (e) {
+      console.warn("Supabase classes query error:", e);
+    }
+  }
+
   return NextResponse.json({ success: true, classes: getClasses() });
 }
 
-/** Create or update: body { id?, name, students (array or newline text) } */
+/** Create or update: body { id?, name, grade?, students (array or newline text) } */
 export async function POST(req: Request) {
   const denied = await teacherOnly(req);
   if (denied) return denied;
+
   const body = await req.json().catch(() => ({}));
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 40) : "";
   if (!name) return NextResponse.json({ success: false, error: "Tên lớp không được để trống" }, { status: 400 });
+
   const id = typeof body.id === "string" && body.id ? body.id : `lop-${Date.now().toString(36)}`;
-  const grade = typeof body.grade === "string" ? body.grade : undefined;
-  return NextResponse.json({ success: true, class: saveClass({ id, name, grade, students: parseStudents(body.students) }) });
+  const grade = typeof body.grade === "string" ? body.grade : "12";
+  const students = parseStudents(body.students);
+
+  const newClass: ClassRoom = { id, name, grade, students };
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { error } = await supabase.from("classes").upsert({
+        id: newClass.id,
+        name: newClass.name,
+        grade: newClass.grade,
+        students: newClass.students,
+        student_count: newClass.students.length,
+      });
+      if (error) {
+        console.error("Supabase classes upsert error:", error);
+      }
+    } catch (e) {
+      console.error("Supabase saveClass failed:", e);
+    }
+  }
+
+  saveClass(newClass);
+  return NextResponse.json({ success: true, class: newClass });
 }
 
 export async function DELETE(req: Request) {
   const denied = await teacherOnly(req);
   if (denied) return denied;
+
   const id = new URL(req.url).searchParams.get("id") || "";
-  if (!deleteClass(id)) return NextResponse.json({ success: false, error: "Không tìm thấy lớp" }, { status: 404 });
+  if (!id) return NextResponse.json({ success: false, error: "Thiếu ID lớp" }, { status: 400 });
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      await supabase.from("classes").delete().eq("id", id);
+    } catch (e) {
+      console.error("Supabase deleteClass failed:", e);
+    }
+  }
+
+  deleteClass(id);
   return NextResponse.json({ success: true });
 }

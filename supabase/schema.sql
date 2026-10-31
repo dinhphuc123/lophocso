@@ -21,9 +21,11 @@ CREATE TABLE IF NOT EXISTS public.classes (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     grade TEXT DEFAULT '12',
+    students JSONB DEFAULT '[]'::jsonb,
     student_count INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS students JSONB DEFAULT '[]'::jsonb;
 
 -- 3. Bảng Bài nộp học sinh (Submissions)
 CREATE TABLE IF NOT EXISTS public.submissions (
