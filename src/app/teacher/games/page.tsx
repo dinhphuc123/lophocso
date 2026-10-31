@@ -20,6 +20,11 @@ function GamesContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const handleSelectMode = (mode: "arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance") => {
+    setSelectedMode(mode);
+    router.replace(`/teacher/games?mode=${mode}`, { scroll: false });
+  };
+
   useEffect(() => {
     if (modeParam && ["arena", "bomb", "farm", "race", "golden_bell", "dance"].includes(modeParam)) {
       setSelectedMode(modeParam);
@@ -102,7 +107,7 @@ function GamesContent() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Mode 1: Race - Đường đua tri thức */}
           <div
-            onClick={() => setSelectedMode("race")}
+            onClick={() => handleSelectMode("race")}
             className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 relative overflow-hidden ${
               selectedMode === "race"
                 ? "border-blue-500 bg-blue-50/40 dark:bg-blue-950/30 shadow-md"
@@ -128,7 +133,7 @@ function GamesContent() {
 
           {/* Mode 2: Golden Bell - Rung chuông vàng */}
           <div
-            onClick={() => setSelectedMode("golden_bell")}
+            onClick={() => handleSelectMode("golden_bell")}
             className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 relative overflow-hidden ${
               selectedMode === "golden_bell"
                 ? "border-amber-500 bg-amber-50/40 dark:bg-amber-950/30 shadow-md"
@@ -154,7 +159,7 @@ function GamesContent() {
 
           {/* Mode 3: Dance - Vũ điệu tri thức */}
           <div
-            onClick={() => setSelectedMode("dance")}
+            onClick={() => handleSelectMode("dance")}
             className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 relative overflow-hidden ${
               selectedMode === "dance"
                 ? "border-purple-500 bg-purple-50/40 dark:bg-purple-950/30 shadow-md"
@@ -180,7 +185,7 @@ function GamesContent() {
 
           {/* Mode 4: Arena */}
           <div
-            onClick={() => setSelectedMode("arena")}
+            onClick={() => handleSelectMode("arena")}
             className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 relative overflow-hidden ${
               selectedMode === "arena"
                 ? "border-amber-500 bg-amber-50/40 dark:bg-amber-950/30 shadow-md"
@@ -203,7 +208,7 @@ function GamesContent() {
 
           {/* Mode 5: Bomb */}
           <div
-            onClick={() => setSelectedMode("bomb")}
+            onClick={() => handleSelectMode("bomb")}
             className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 relative overflow-hidden ${
               selectedMode === "bomb"
                 ? "border-rose-500 bg-rose-50/40 dark:bg-rose-950/30 shadow-md"
@@ -226,7 +231,7 @@ function GamesContent() {
 
           {/* Mode 6: Farm */}
           <div
-            onClick={() => setSelectedMode("farm")}
+            onClick={() => handleSelectMode("farm")}
             className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-3 relative overflow-hidden ${
               selectedMode === "farm"
                 ? "border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/30 shadow-md"

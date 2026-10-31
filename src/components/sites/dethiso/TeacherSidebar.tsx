@@ -1,7 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { 
   LayoutDashboard, 
   FileText, 
@@ -12,10 +13,9 @@ import {
   BarChart3, 
   Settings,
   PlusCircle,
-  HelpCircle,
-  Sparkles,
   Sword,
-  Bomb
+  Bomb,
+  LogOut
 } from "lucide-react";
 
 interface TeacherSidebarProps {
@@ -23,16 +23,93 @@ interface TeacherSidebarProps {
   onClose?: () => void;
 }
 
+interface NavItem {
+  name: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  badge?: string;
+  tag?: string;
+}
+
+function GamesNavSection({ pathname, onClose }: { pathname: string; onClose?: () => void }) {
+  const searchParams = useSearchParams();
+  const currentMode = searchParams.get("mode") || "";
+
+  const gamesNav = [
+    { 
+      name: "Game lớp học", 
+      href: "/teacher/games", 
+      mode: "", 
+      icon: Gamepad2, 
+      tag: "MỚI",
+      activeBg: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold",
+      iconColor: "text-blue-600 dark:text-blue-400"
+    },
+    { 
+      name: "Đấu trường RPG", 
+      href: "/teacher/games?mode=arena", 
+      mode: "arena", 
+      icon: Sword, 
+      activeBg: "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200 font-semibold",
+      iconColor: "text-amber-600 dark:text-amber-400"
+    },
+    { 
+      name: "Gỡ bom sinh tử", 
+      href: "/teacher/games?mode=bomb", 
+      mode: "bomb", 
+      icon: Bomb, 
+      activeBg: "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200 font-semibold",
+      iconColor: "text-rose-600 dark:text-rose-400"
+    },
+  ];
+
+  const isGamesPath = pathname === "/teacher/games";
+
+  return (
+    <div>
+      <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
+        <span>Trò chơi trên lớp</span>
+        <Gamepad2 className="w-3.5 h-3.5" />
+      </div>
+      <nav className="space-y-1">
+        {gamesNav.map((item) => {
+          const isActive = item.mode 
+            ? isGamesPath && currentMode === item.mode
+            : isGamesPath && (!currentMode || currentMode === "race");
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className={`
+                flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors
+                ${isActive 
+                  ? item.activeBg
+                  : "text-foreground/80 hover:bg-muted hover:text-foreground"
+                }
+              `}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className={`w-4 h-4 ${isActive ? item.iconColor : "text-muted-foreground"}`} />
+                <span>{item.name}</span>
+              </div>
+              {item.tag && !isActive && (
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-sm bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  {item.tag}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
 export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps) {
   const pathname = usePathname();
-
-  interface NavItem {
-    name: string;
-    href: string;
-    icon: typeof LayoutDashboard;
-    badge?: string;
-    tag?: string;
-  }
 
   const mainNav: NavItem[] = [
     { name: "Tổng quan", href: "/teacher/dashboard", icon: LayoutDashboard },
@@ -41,12 +118,6 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
     { name: "Chấm phiếu OMR", href: "/teacher/omr", icon: Camera },
     { name: "Giáo án NLS", href: "/teacher/lesson-plans", icon: BookOpen, tag: "MỚI" },
     { name: "Báo cáo năng lực", href: "/teacher/reports", icon: BarChart3 },
-  ];
-
-  const gamesNav = [
-    { name: "Game lớp học (Mới)", href: "/teacher/games", icon: Gamepad2, color: "text-amber-500", tag: "HOT" },
-    { name: "Đấu trường RPG", href: "/teacher/games?mode=arena", icon: Sword, color: "text-amber-500" },
-    { name: "Gỡ Bom kiến thức", href: "/teacher/games?mode=bomb", icon: Bomb, color: "text-rose-500" },
   ];
 
   return (
@@ -136,28 +207,9 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
             </nav>
           </div>
 
-          <div>
-            <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
-              <span>Trò chơi trên lớp</span>
-              <Gamepad2 className="w-3.5 h-3.5" />
-            </div>
-            <nav className="space-y-1">
-              {gamesNav.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={onClose}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg font-medium text-foreground/80 hover:bg-muted hover:text-foreground transition-colors"
-                  >
-                    <Icon className={`w-4 h-4 ${item.color}`} />
-                    <span>{item.name}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
+          <Suspense fallback={<div className="h-24 animate-pulse bg-muted/40 rounded-xl" />}>
+            <GamesNavSection pathname={pathname} onClose={onClose} />
+          </Suspense>
         </div>
 
         {/* Footer info / settings */}
@@ -165,7 +217,11 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
           <Link
             href="/teacher/settings"
             onClick={onClose}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-foreground/80 hover:bg-muted transition-colors"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              pathname === "/teacher/settings"
+                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold"
+                : "text-foreground/80 hover:bg-muted transition-colors"
+            }`}
           >
             <Settings className="w-4 h-4 text-muted-foreground" />
             <span>Cài đặt tài khoản</span>
@@ -182,7 +238,7 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
             }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
           >
-            <Settings className="w-4 h-4 opacity-0" />
+            <LogOut className="w-4 h-4 text-rose-600" />
             <span>Đăng xuất</span>
           </button>
         </div>
