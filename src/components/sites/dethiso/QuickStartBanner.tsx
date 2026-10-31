@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Upload, CheckCircle, Share2, PlayCircle, FileText } from "lucide-react";
+import { Upload, CheckCircle, Share2, FileText } from "lucide-react";
 
 export function QuickStartBanner() {
   const steps = [
@@ -41,15 +41,6 @@ export function QuickStartBanner() {
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0">
-          <a
-            href="https://youtube.com/@thaydungcongnghe"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-card border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors"
-          >
-            <PlayCircle className="w-4 h-4 text-rose-500" />
-            <span>Xem video hướng dẫn</span>
-          </a>
           <Link 
             href="/teacher/exams/create"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
