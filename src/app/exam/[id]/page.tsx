@@ -30,7 +30,12 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
   const [result, setResult] = useState<StudentSubmission | null>(null);
 
   useEffect(() => {
-    const code = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("code") : null;
+    const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const classFromQuery = searchParams?.get("class");
+    if (classFromQuery) {
+      setStudentClass(classFromQuery);
+    }
+    const code = searchParams?.get("code");
     const query = code ? `?code=${encodeURIComponent(code)}` : "";
     fetch(`/api/exams/${examId}${query}`)
       .then((res) => res.json())
@@ -40,6 +45,9 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
         } else {
           setExam(data.exam);
           setTimeLeft(data.exam.durationMinutes * 60);
+          if (!classFromQuery && data.exam?.targetClass && data.exam.targetClass !== "Toàn trường") {
+            setStudentClass(data.exam.targetClass);
+          }
         }
       })
       .catch((err) => setError(err.message))

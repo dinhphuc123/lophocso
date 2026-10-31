@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { 
@@ -26,8 +26,24 @@ export default function CreateExamPage() {
   const [inputMode, setInputMode] = useState<"upload" | "paste">("upload");
   const [title, setTitle] = useState("Đề kiểm tra trắc nghiệm Toán 12 - Chuẩn BGD 2025");
   const [subject, setSubject] = useState("Toán học 12");
-  const [targetClass, setTargetClass] = useState("12A1, 12A2");
+  const [targetClass, setTargetClass] = useState("Toàn trường");
   const [duration, setDuration] = useState(45);
+  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/classes")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && d.classes?.length > 0) {
+          const names = d.classes.map((c: { name: string }) => c.name);
+          setAvailableClasses(names);
+          if (names.length > 0) {
+            setTargetClass(names[0]);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
   
   // File upload state
   const [isUploading, setIsUploading] = useState(false);
@@ -338,14 +354,29 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-foreground">Lớp học</label>
-            <input
-              type="text"
-              value={targetClass}
-              onChange={(e) => setTargetClass(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="VD: 12A1"
-            />
+            <label className="text-xs font-semibold text-foreground">Lớp học nhận bài</label>
+            {availableClasses.length > 0 ? (
+              <select
+                value={targetClass}
+                onChange={(e) => setTargetClass(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium cursor-pointer"
+              >
+                <option value="Toàn trường">Toàn trường</option>
+                {availableClasses.map((cls) => (
+                  <option key={cls} value={cls}>
+                    Lớp {cls}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={targetClass}
+                onChange={(e) => setTargetClass(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="VD: 12A1"
+              />
+            )}
           </div>
 
           <div className="space-y-1.5">

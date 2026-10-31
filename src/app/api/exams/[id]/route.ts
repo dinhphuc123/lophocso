@@ -86,3 +86,75 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ success: false, error }, { status: 500 });
   }
 }
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await teacherOnly(req);
+  if (denied) return denied;
+
+  try {
+    const { id } = await params;
+    const body = await req.json();
+    const { targetClass, durationMinutes, deadline, status, title } = body;
+
+    let exam = getExamById(id);
+    const supabase = getSupabase();
+
+    if (!exam && supabase) {
+      const { data } = await supabase.from("exams").select("*").eq("id", id).maybeSingle();
+      if (data) {
+        exam = {
+          id: String(data.id),
+          title: String(data.title),
+          subject: String(data.subject || "Toán học"),
+          targetClass: String(data.target_class || "Toàn trường"),
+          durationMinutes: Number(data.duration_minutes || data.duration) || 45,
+          deadline: data.deadline ? String(data.deadline) : undefined,
+          status: (data.status as Exam["status"]) || "open",
+          createdAt: String(data.created_at || new Date().toISOString()),
+          questions: Array.isArray(data.questions) ? (data.questions as Exam["questions"]) : [],
+        };
+      }
+    }
+
+    if (!exam) {
+      return NextResponse.json({ success: false, error: "Không tìm thấy đề thi" }, { status: 404 });
+    }
+
+    if (targetClass !== undefined) exam.targetClass = String(targetClass).trim();
+    if (durationMinutes !== undefined) exam.durationMinutes = Number(durationMinutes) || 45;
+    if (deadline !== undefined) exam.deadline = deadline ? String(deadline) : undefined;
+    if (status !== undefined) exam.status = status;
+    if (title !== undefined) exam.title = String(title).trim();
+
+    saveExam(exam);
+
+    if (supabase) {
+      const fullUpdate: Record<string, unknown> = {
+        title: exam.title,
+        target_class: exam.targetClass,
+        duration_minutes: exam.durationMinutes,
+        duration: exam.durationMinutes,
+        deadline: exam.deadline || null,
+        status: exam.status,
+        description: `Lớp: ${exam.targetClass} | Thời lượng: ${exam.durationMinutes} phút`,
+        updated_at: new Date().toISOString(),
+      };
+      const res1 = await supabase.from("exams").update(fullUpdate).eq("id", id);
+      if (res1.error) {
+        const baseUpdate: Record<string, unknown> = {
+          title: exam.title,
+          duration: exam.durationMinutes,
+          status: exam.status,
+          description: `Lớp: ${exam.targetClass} | Thời lượng: ${exam.durationMinutes} phút`,
+          updated_at: new Date().toISOString(),
+        };
+        await supabase.from("exams").update(baseUpdate).eq("id", id);
+      }
+    }
+
+    return NextResponse.json({ success: true, exam });
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ success: false, error }, { status: 500 });
+  }
+}
