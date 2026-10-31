@@ -65,8 +65,8 @@ export function TeacherHeader({ onOpenSidebar }: TeacherHeaderProps) {
             <User className="w-4 h-4" />
           </div>
           <div className="hidden sm:block text-left text-xs">
-            <div className="font-semibold text-foreground leading-tight">Thầy Nguyễn Văn A</div>
-            <div className="text-[10px] text-muted-foreground">THPT Chuyên · khaothiso.vn</div>
+            <div className="font-semibold text-foreground leading-tight">Giáo viên</div>
+            <div className="text-[10px] text-muted-foreground">Khảo Thí Số · khaothiso.vn</div>
           </div>
         </div>
       </div>

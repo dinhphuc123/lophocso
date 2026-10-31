@@ -26,10 +26,18 @@ interface TeacherSidebarProps {
 export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps) {
   const pathname = usePathname();
 
-  const mainNav = [
+  interface NavItem {
+    name: string;
+    href: string;
+    icon: typeof LayoutDashboard;
+    badge?: string;
+    tag?: string;
+  }
+
+  const mainNav: NavItem[] = [
     { name: "Tổng quan", href: "/teacher/dashboard", icon: LayoutDashboard },
-    { name: "Đề thi của tôi", href: "/teacher/exams", icon: FileText, badge: "12" },
-    { name: "Lớp học & Sổ điểm", href: "/teacher/classes", icon: Users, badge: "4 lớp" },
+    { name: "Đề thi của tôi", href: "/teacher/exams", icon: FileText },
+    { name: "Lớp học & Sổ điểm", href: "/teacher/classes", icon: Users },
     { name: "Chấm phiếu OMR", href: "/teacher/omr", icon: Camera },
     { name: "Giáo án NLS", href: "/teacher/lesson-plans", icon: BookOpen, tag: "MỚI" },
     { name: "Báo cáo năng lực", href: "/teacher/reports", icon: BarChart3 },

@@ -26,30 +26,6 @@ export function DifficultQuestions() {
       .catch(() => {});
   }, []);
 
-  const displayList = questions.length > 0 ? questions : [
-    {
-      examTitle: "Ôn tập giữa kì 2 Toán 12",
-      questionNo: "Câu 34",
-      topic: "Cực trị hàm hợp chứa dấu giá trị tuyệt đối",
-      wrongRate: "72%",
-      totalAnswers: 76,
-    },
-    {
-      examTitle: "Kiểm tra 15 phút Đạo hàm",
-      questionNo: "Câu 18",
-      topic: "Đúng/Sai: Tính đơn điệu trên khoảng vô hạn",
-      wrongRate: "58%",
-      totalAnswers: 41,
-    },
-    {
-      examTitle: "Ôn tập giữa kì 2 Toán 12",
-      questionNo: "Câu 38",
-      topic: "Hình Oxyz: Khoảng cách giữa hai đường chéo nhau",
-      wrongRate: "54%",
-      totalAnswers: 76,
-    },
-  ];
-
   return (
     <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-xs flex flex-col justify-between">
       <div>
@@ -68,31 +44,37 @@ export function DifficultQuestions() {
           </span>
         </div>
 
-        <div className="divide-y divide-border/60 mt-2">
-          {displayList.map((q, i) => (
-            <div key={i} className="py-3 flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
-                    {q.questionNo}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-medium truncate max-w-[180px] sm:max-w-xs">
-                    {q.examTitle}
-                  </span>
+        {questions.length === 0 ? (
+          <div className="py-8 text-center text-xs text-muted-foreground">
+            Chưa có dữ liệu câu hỏi sai. Thầy/Cô hãy giao đề thi để xem phân tích tự động.
+          </div>
+        ) : (
+          <div className="divide-y divide-border/60 mt-2">
+            {questions.map((q, i) => (
+              <div key={i} className="py-3 flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
+                      {q.questionNo}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-medium truncate max-w-[180px] sm:max-w-xs">
+                      {q.examTitle}
+                    </span>
+                  </div>
+                  <div className="text-xs text-foreground/90 font-medium">
+                    {q.topic}
+                  </div>
                 </div>
-                <div className="text-xs text-foreground/90 font-medium">
-                  {q.topic}
+                <div className="text-right shrink-0">
+                  <span className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                    {q.wrongRate}
+                  </span>
+                  <div className="text-[10px] text-muted-foreground">học sinh sai</div>
                 </div>
               </div>
-              <div className="text-right shrink-0">
-                <span className="text-sm font-bold text-rose-600 dark:text-rose-400">
-                  {q.wrongRate}
-                </span>
-                <div className="text-[10px] text-muted-foreground">học sinh sai</div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="pt-3 border-t border-border/60 text-center">

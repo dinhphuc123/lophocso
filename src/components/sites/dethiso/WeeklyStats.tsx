@@ -29,16 +29,17 @@ export function WeeklyStats() {
       .catch(() => {});
   }, []);
 
-  const displayData = dailyData.length > 0 ? dailyData : [
-    { day: "Thứ Hai", count: 18, height: "45%" },
-    { day: "Thứ Ba", count: 24, height: "60%" },
-    { day: "Thứ Tư", count: 12, height: "30%" },
-    { day: "Thứ Năm", count: 32, height: "80%" },
-    { day: "Thứ Sáu", count: 40, height: "100%" },
-    { day: "Thứ Bảy", count: 28, height: "70%" },
-    { day: "Chủ Nhật", count: 15, height: "38%" },
+  const emptyDays: DayStat[] = [
+    { day: "T2", count: 0, height: "4px" },
+    { day: "T3", count: 0, height: "4px" },
+    { day: "T4", count: 0, height: "4px" },
+    { day: "T5", count: 0, height: "4px" },
+    { day: "T6", count: 0, height: "4px" },
+    { day: "T7", count: 0, height: "4px" },
+    { day: "CN", count: 0, height: "4px" },
   ];
 
+  const displayData = dailyData.length > 0 ? dailyData : emptyDays;
   const highestDay = displayData.reduce((prev, current) => (current.count > prev.count ? current : prev), displayData[0]);
 
   return (
@@ -51,11 +52,11 @@ export function WeeklyStats() {
             </div>
             <div>
               <h3 className="font-bold text-sm text-foreground">Bài nộp 7 ngày qua</h3>
-              <p className="text-[11px] text-muted-foreground">Phân bố lượt nộp bài theo từng ngày trong tuần</p>
+              <p className="text-[11px] text-muted-foreground">Phân bổ lượt nộp bài theo từng ngày trong tuần</p>
             </div>
           </div>
           <span className="text-xs font-bold text-blue-600 dark:text-blue-400 font-mono">
-            Tổng {totalCount > 0 ? totalCount : 128} bài
+            Tổng: {totalCount} bài
           </span>
         </div>
 
@@ -68,7 +69,7 @@ export function WeeklyStats() {
               </span>
               <div 
                 className="w-full max-w-[28px] bg-blue-600/80 hover:bg-blue-600 rounded-t-md transition-all cursor-pointer"
-                style={{ height: d.height }}
+                style={{ height: d.height || "4px" }}
               />
               <span className="text-[10px] text-muted-foreground truncate w-full text-center">
                 {d.day.replace("Thứ ", "T")}
@@ -79,7 +80,7 @@ export function WeeklyStats() {
       </div>
 
       <div className="pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
-        <span>Cao nhất: {highestDay.day} ({highestDay.count} bài)</span>
+        <span>Cao nhất: {highestDay.count > 0 ? `${highestDay.day} (${highestDay.count} bài)` : "Chưa có lượt nộp"}</span>
         <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
           {changePercent >= 0 ? `+${changePercent}%` : `${changePercent}%`} so với tuần trước
         </span>

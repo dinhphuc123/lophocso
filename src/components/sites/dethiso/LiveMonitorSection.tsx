@@ -27,13 +27,6 @@ export function LiveMonitorSection() {
       .catch(() => {});
   }, []);
 
-  const displayList = students.length > 0 ? students : [
-    { name: "Trần Minh Quân", class: "12A1", exam: "Ôn tập giữa kì 2", progress: "32/40 câu", time: "18 phút", status: "active" },
-    { name: "Lê Hoàng Yến", class: "12A1", exam: "Ôn tập giữa kì 2", progress: "28/40 câu", time: "15 phút", status: "active" },
-    { name: "Nguyễn Đức Anh", class: "12A2", exam: "Ôn tập giữa kì 2", progress: "40/40 câu", time: "Vừa nộp bài", status: "submitted" },
-    { name: "Phạm Quỳnh Chi", class: "12A1", exam: "Ôn tập giữa kì 2", progress: "14/40 câu", time: "8 phút", status: "warning" },
-  ];
-
   return (
     <div className="rounded-xl border border-border bg-card p-4 sm:p-5 shadow-xs">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
@@ -62,40 +55,46 @@ export function LiveMonitorSection() {
         </Link>
       </div>
 
-      <div className="divide-y divide-border/60">
-        {displayList.map((st, i) => (
-          <div key={i} className="py-3 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center font-bold text-foreground text-[11px]">
-                {st.name.split(" ").slice(-1)[0][0]}
-              </div>
-              <div>
-                <div className="font-semibold text-foreground flex items-center gap-1.5">
-                  <span>{st.name}</span>
-                  <span className="text-[10px] text-muted-foreground font-normal">({st.class})</span>
+      {students.length === 0 ? (
+        <div className="py-8 text-center text-xs text-muted-foreground">
+          Chưa có học sinh nào đang làm bài trực tuyến.
+        </div>
+      ) : (
+        <div className="divide-y divide-border/60">
+          {students.map((st, i) => (
+            <div key={i} className="py-3 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center font-bold text-foreground text-[11px]">
+                  {st.name.split(" ").slice(-1)[0][0]}
                 </div>
-                <div className="text-[11px] text-muted-foreground truncate max-w-[200px] sm:max-w-xs">
-                  {st.exam}
+                <div>
+                  <div className="font-semibold text-foreground flex items-center gap-1.5">
+                    <span>{st.name}</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">({st.class})</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground truncate max-w-[200px] sm:max-w-xs">
+                    {st.exam}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-4 text-right">
-              <div>
-                <div className="font-bold text-foreground">{st.progress}</div>
-                <div className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
-                  <Clock className="w-3 h-3" />
-                  {st.time}
+              <div className="flex items-center gap-4 text-right">
+                <div>
+                  <div className="font-bold text-foreground">{st.progress}</div>
+                  <div className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
+                    <Clock className="w-3 h-3" />
+                    {st.time}
+                  </div>
                 </div>
+                <span className={`w-2 h-2 rounded-full ${
+                  st.status === "submitted" ? "bg-blue-500" :
+                  st.status === "warning" ? "bg-amber-500" : "bg-emerald-500"
+                }`} />
               </div>
-              <span className={`w-2 h-2 rounded-full ${
-                st.status === "submitted" ? "bg-blue-500" :
-                st.status === "warning" ? "bg-amber-500" : "bg-emerald-500"
-              }`} />
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

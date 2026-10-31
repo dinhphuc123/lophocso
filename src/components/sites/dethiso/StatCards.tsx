@@ -22,35 +22,39 @@ export function StatCards() {
   const cardItems = [
     {
       title: "Bài nộp 7 ngày",
-      value: stats ? stats.weeklySubmissionsCount.toString() : "128",
+      value: stats ? stats.weeklySubmissionsCount.toString() : "0",
       unit: "bài",
-      change: stats ? `+${stats.weeklyChangePercent}%` : "+14%",
-      changeText: "so với 7 ngày trước",
+      change: stats ? `+${stats.weeklyChangePercent}%` : "0%",
+      changeText: "so với tuần trước",
       icon: FileCheck,
       color: "blue",
     },
     {
       title: "Điểm trung bình tuần",
-      value: stats ? stats.averageScore.toString() : "7.6",
+      value: stats && stats.averageScore > 0 ? stats.averageScore.toString() : "0.0",
       unit: "điểm",
-      detail: stats ? `${stats.highScorePercent}% từ 8 trở lên · ${stats.lowScorePercent}% dưới 5` : "68% từ 8 trở lên · 4% dưới 5",
+      detail: stats && stats.weeklySubmissionsCount > 0
+        ? `${stats.highScorePercent}% từ 8 trở lên · ${stats.lowScorePercent}% dưới 5`
+        : "Chưa có lượt nộp bài",
       icon: TrendingUp,
       color: "emerald",
     },
     {
       title: "Đang làm bài ngay lúc này",
-      value: stats ? stats.activeStudentsNow.toString() : "18",
+      value: stats ? stats.activeStudentsNow.toString() : "0",
       unit: "học sinh",
-      detail: "Live polling · tự cập nhật mỗi 30s",
+      detail: "Giám sát trực tiếp · Tự cập nhật mỗi 30s",
       icon: Users,
       color: "violet",
       isLive: true,
     },
     {
       title: "Cần làm hôm nay",
-      value: stats ? (stats.pendingGradingCount + stats.expiringExamsCount).toString() : "3",
+      value: stats ? (stats.pendingGradingCount + stats.expiringExamsCount).toString() : "0",
       unit: "việc",
-      detail: stats ? `${stats.pendingGradingCount} bài chờ chấm · ${stats.expiringExamsCount} đề đang mở` : "2 bài tự luận chờ chấm · 1 đề sắp hết hạn",
+      detail: stats && (stats.pendingGradingCount > 0 || stats.expiringExamsCount > 0)
+        ? `${stats.pendingGradingCount} bài chờ chấm · ${stats.expiringExamsCount} đề đang mở`
+        : "Không có công việc tồn đọng",
       icon: AlertCircle,
       color: "amber",
       hasAction: true,
