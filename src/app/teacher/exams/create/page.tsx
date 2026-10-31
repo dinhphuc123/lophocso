@@ -483,10 +483,10 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
           </Link>
           <button
             onClick={handlePublish}
-            disabled={loading || parsedQuestions.length === 0}
+            disabled={loading || (parsedQuestions.length === 0 && (!rawText || !rawText.trim()))}
             className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
           >
-            {loading ? "Đang xuất bản..." : `Xuất bản đề thi (${parsedQuestions.length} câu) →`}
+            {loading ? "Đang xuất bản..." : `Xuất bản đề thi (${parsedQuestions.length > 0 ? parsedQuestions.length : "tự động tách"} câu) →`}
           </button>
         </div>
       </div>

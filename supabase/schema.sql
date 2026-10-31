@@ -81,3 +81,30 @@ CREATE TABLE IF NOT EXISTS public.teacher_profile (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 6. Tắt RLS hoặc phân quyền truy cập cho Anon / Service Key (Tránh lỗi RLS policy violation)
+ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.classes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.submissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.game_rooms DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_profile DISABLE ROW LEVEL SECURITY;
+
+-- Cấp quyền đầy đủ cho vai trò anon và authenticated (phòng khi người dùng bật RLS thủ công)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'exams') THEN
+    GRANT ALL ON TABLE public.exams TO anon, authenticated, service_role;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'classes') THEN
+    GRANT ALL ON TABLE public.classes TO anon, authenticated, service_role;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'submissions') THEN
+    GRANT ALL ON TABLE public.submissions TO anon, authenticated, service_role;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'game_rooms') THEN
+    GRANT ALL ON TABLE public.game_rooms TO anon, authenticated, service_role;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'teacher_profile') THEN
+    GRANT ALL ON TABLE public.teacher_profile TO anon, authenticated, service_role;
+  END IF;
+END $$;

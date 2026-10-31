@@ -17,22 +17,38 @@ export async function GET(req: Request) {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (!error && data) {
-        const exams: Exam[] = data.map((row: Record<string, unknown>) => ({
-          id: String(row.id),
-          title: String(row.title),
-          subject: String(row.subject || "Toán học"),
-          targetClass: String(row.target_class || "Toàn trường"),
-          durationMinutes: Number(row.duration_minutes || row.duration) || 45,
-          deadline: row.deadline ? String(row.deadline) : undefined,
-          status: (row.status as Exam["status"]) || "open",
-          createdAt: String(row.created_at || new Date().toISOString()),
-          questions: Array.isArray(row.questions) ? (row.questions as Exam["questions"]) : [],
-        }));
+      if (!error && Array.isArray(data)) {
+        const exams: Exam[] = data.map((row: Record<string, unknown>) => {
+          let targetClass = String(row.target_class || "");
+          if (!targetClass && typeof row.description === "string" && row.description.includes("Lớp: ")) {
+            targetClass = row.description.split("|")[0].replace("Lớp: ", "").trim();
+          }
+          if (!targetClass) targetClass = "Toàn trường";
+
+          return {
+            id: String(row.id),
+            title: String(row.title),
+            subject: String(row.subject || "Toán học"),
+            targetClass,
+            durationMinutes: Number(row.duration_minutes || row.duration) || 45,
+            deadline: row.deadline ? String(row.deadline) : undefined,
+            status: (row.status as Exam["status"]) || "open",
+            createdAt: String(row.created_at || new Date().toISOString()),
+            questions: Array.isArray(row.questions) ? (row.questions as Exam["questions"]) : [],
+          };
+        });
+
+        // Also cache in local memory for offline fallback
+        for (const ex of exams) {
+          saveExam(ex);
+        }
+
         return NextResponse.json({ success: true, exams });
+      } else if (error) {
+        console.warn("Supabase getExams query error, falling back to local memory:", error);
       }
     } catch (err) {
-      console.warn("Supabase getExams error:", err);
+      console.warn("Supabase getExams exception, falling back to local memory:", err);
     }
   }
 
@@ -79,25 +95,50 @@ export async function POST(req: Request) {
 
     const supabase = getSupabase();
     if (supabase) {
-      try {
-        const { error } = await supabase.from("exams").upsert({
+      // 1. Attempt insert with extended schema
+      const fullRecord: Record<string, unknown> = {
+        id: newExam.id,
+        title: newExam.title,
+        subject: newExam.subject,
+        grade: "12",
+        status: newExam.status,
+        duration: newExam.durationMinutes,
+        duration_minutes: newExam.durationMinutes,
+        target_class: newExam.targetClass,
+        deadline: newExam.deadline || null,
+        total_questions: newExam.questions.length,
+        questions: newExam.questions,
+        description: `Lớp: ${newExam.targetClass} | Thời lượng: ${newExam.durationMinutes} phút`,
+        created_at: newExam.createdAt,
+        updated_at: newExam.createdAt,
+      };
+
+      const res1 = await supabase.from("exams").upsert(fullRecord);
+      if (res1.error) {
+        console.warn("Supabase upsert with extended columns failed, falling back to base columns:", res1.error);
+
+        // 2. Fallback to base schema in case user didn't run ALTER TABLE
+        const baseRecord: Record<string, unknown> = {
           id: newExam.id,
           title: newExam.title,
           subject: newExam.subject,
-          target_class: newExam.targetClass,
-          duration_minutes: newExam.durationMinutes,
-          duration: newExam.durationMinutes,
-          deadline: newExam.deadline,
+          grade: "12",
           status: newExam.status,
+          duration: newExam.durationMinutes,
           total_questions: newExam.questions.length,
           questions: newExam.questions,
+          description: `Lớp: ${newExam.targetClass} | Thời lượng: ${newExam.durationMinutes} phút`,
           created_at: newExam.createdAt,
-        });
-        if (error) {
-          console.error("Supabase upsert exam error:", error);
+        };
+
+        const res2 = await supabase.from("exams").upsert(baseRecord);
+        if (res2.error) {
+          console.error("Supabase upsert with base columns also failed:", res2.error);
+          return NextResponse.json({
+            success: false,
+            error: `Lỗi Supabase: ${res2.error.message}. Vui lòng kiểm tra quyền RLS hoặc bảng exams trong Supabase.`,
+          }, { status: 500 });
         }
-      } catch (err) {
-        console.error("Supabase saveExam failed:", err);
       }
     }
 

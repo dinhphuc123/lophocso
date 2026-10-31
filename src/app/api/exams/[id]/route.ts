@@ -11,31 +11,39 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const { id } = await params;
     const code = new URL(req.url).searchParams.get("code");
-    let exam = getExamById(id);
+    let exam: Exam | undefined;
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from("exams").select("*").eq("id", id).maybeSingle();
+        if (!error && data) {
+          let targetClass = String(data.target_class || "");
+          if (!targetClass && typeof data.description === "string" && data.description.includes("Lớp: ")) {
+            targetClass = data.description.split("|")[0].replace("Lớp: ", "").trim();
+          }
+          if (!targetClass) targetClass = "Toàn trường";
+
+          exam = {
+            id: String(data.id),
+            title: String(data.title),
+            subject: String(data.subject || "Toán học"),
+            targetClass,
+            durationMinutes: Number(data.duration_minutes || data.duration) || 45,
+            deadline: data.deadline ? String(data.deadline) : undefined,
+            status: (data.status as Exam["status"]) || "open",
+            createdAt: String(data.created_at || new Date().toISOString()),
+            questions: Array.isArray(data.questions) ? (data.questions as Exam["questions"]) : [],
+          };
+          saveExam(exam); // Cache in memory
+        }
+      } catch (err) {
+        console.warn("Supabase getExamById error:", err);
+      }
+    }
 
     if (!exam) {
-      const supabase = getSupabase();
-      if (supabase) {
-        try {
-          const { data, error } = await supabase.from("exams").select("*").eq("id", id).maybeSingle();
-          if (!error && data) {
-            exam = {
-              id: String(data.id),
-              title: String(data.title),
-              subject: String(data.subject || "Toán học"),
-              targetClass: String(data.target_class || "Toàn trường"),
-              durationMinutes: Number(data.duration_minutes || data.duration) || 45,
-              deadline: data.deadline ? String(data.deadline) : undefined,
-              status: (data.status as Exam["status"]) || "open",
-              createdAt: String(data.created_at || new Date().toISOString()),
-              questions: Array.isArray(data.questions) ? (data.questions as Exam["questions"]) : [],
-            };
-            saveExam(exam); // Cache in memory
-          }
-        } catch (err) {
-          console.warn("Supabase getExamById error:", err);
-        }
-      }
+      exam = getExamById(id);
     }
 
     if (!exam) {
@@ -62,9 +70,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const supabase = getSupabase();
     if (supabase) {
       try {
-        await supabase.from("exams").delete().eq("id", id);
+        const { error } = await supabase.from("exams").delete().eq("id", id);
+        if (error) {
+          console.error("Supabase deleteExam error:", error);
+        }
       } catch (err) {
-        console.error("Supabase deleteExam error:", err);
+        console.error("Supabase deleteExam exception:", err);
       }
     }
 
