@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Bell, Menu, Search, User } from "lucide-react";
 
 interface TeacherHeaderProps {
@@ -17,6 +18,20 @@ function getInitialGreeting(): string {
 
 export function TeacherHeader({ onOpenSidebar }: TeacherHeaderProps) {
   const [greeting] = useState(getInitialGreeting);
+  const [teacherName, setTeacherName] = useState("Giáo viên");
+  const [school, setSchool] = useState("Khảo Thí Số · khaothiso.vn");
+
+  useEffect(() => {
+    fetch("/api/teacher/profile")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.profile) {
+          if (data.profile.name) setTeacherName(data.profile.name);
+          if (data.profile.school) setSchool(data.profile.school);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur-md border-b border-border flex items-center justify-between px-4 sm:px-6">
@@ -53,22 +68,26 @@ export function TeacherHeader({ onOpenSidebar }: TeacherHeaderProps) {
         {/* Notifications */}
         <button 
           className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-          title="Thông báo (3 chưa đọc)"
+          title="Thông báo hệ thống"
         >
           <Bell className="w-4 h-4" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-600 ring-2 ring-background animate-pulse" />
         </button>
 
-        {/* User profile */}
-        <div className="flex items-center gap-2.5 pl-2 border-l border-border/80">
+        {/* User profile link */}
+        <Link 
+          href="/teacher/settings" 
+          title="Cài đặt tài khoản"
+          className="flex items-center gap-2.5 pl-2 border-l border-border/80 hover:opacity-80 transition-opacity"
+        >
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center font-semibold text-xs shadow-xs">
             <User className="w-4 h-4" />
           </div>
-          <div className="hidden sm:block text-left text-xs">
-            <div className="font-semibold text-foreground leading-tight">Giáo viên</div>
-            <div className="text-[10px] text-muted-foreground">Khảo Thí Số · khaothiso.vn</div>
+          <div className="hidden sm:block text-left text-xs max-w-[140px]">
+            <div className="font-semibold text-foreground leading-tight truncate">{teacherName}</div>
+            <div className="text-[10px] text-muted-foreground truncate">{school}</div>
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   );

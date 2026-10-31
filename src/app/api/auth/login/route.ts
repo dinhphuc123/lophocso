@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
-import { AUTH_COOKIE, AUTH_MAX_AGE_SEC, checkPassword, createToken, teacherPassword } from "@/lib/auth";
+import { AUTH_COOKIE, AUTH_MAX_AGE_SEC, createToken } from "@/lib/auth";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { verifyTeacherPassword } from "@/lib/profile";
 
 export async function POST(req: Request) {
   if (!rateLimit(`login:${clientIp(req)}`, 5, 60_000)) {
     return NextResponse.json({ success: false, error: "Thử lại sau 1 phút" }, { status: 429 });
   }
-  if (!teacherPassword()) {
-    return NextResponse.json({ success: false, error: "Máy chủ chưa đặt TEACHER_PASSWORD" }, { status: 503 });
-  }
   const { password } = await req.json().catch(() => ({ password: "" }));
-  if (typeof password !== "string" || !checkPassword(password)) {
+  if (typeof password !== "string" || !(await verifyTeacherPassword(password))) {
     return NextResponse.json({ success: false, error: "Sai mật khẩu" }, { status: 401 });
   }
   const res = NextResponse.json({ success: true });

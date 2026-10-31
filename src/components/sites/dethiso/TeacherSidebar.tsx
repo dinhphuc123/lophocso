@@ -1,21 +1,17 @@
 "use client";
 
-import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, 
   FileText, 
   Users, 
   Gamepad2, 
   Camera, 
-  BookOpen, 
   BarChart3, 
-  Settings,
-  PlusCircle,
-  Sword,
-  Bomb,
-  LogOut
+  Settings, 
+  PlusCircle, 
+  LogOut 
 } from "lucide-react";
 
 interface TeacherSidebarProps {
@@ -31,83 +27,6 @@ interface NavItem {
   tag?: string;
 }
 
-function GamesNavSection({ pathname, onClose }: { pathname: string; onClose?: () => void }) {
-  const searchParams = useSearchParams();
-  const currentMode = searchParams.get("mode") || "";
-
-  const gamesNav = [
-    { 
-      name: "Game lớp học", 
-      href: "/teacher/games", 
-      mode: "", 
-      icon: Gamepad2, 
-      tag: "MỚI",
-      activeBg: "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold",
-      iconColor: "text-blue-600 dark:text-blue-400"
-    },
-    { 
-      name: "Đấu trường RPG", 
-      href: "/teacher/games?mode=arena", 
-      mode: "arena", 
-      icon: Sword, 
-      activeBg: "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200 font-semibold",
-      iconColor: "text-amber-600 dark:text-amber-400"
-    },
-    { 
-      name: "Gỡ bom sinh tử", 
-      href: "/teacher/games?mode=bomb", 
-      mode: "bomb", 
-      icon: Bomb, 
-      activeBg: "bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200 font-semibold",
-      iconColor: "text-rose-600 dark:text-rose-400"
-    },
-  ];
-
-  const isGamesPath = pathname === "/teacher/games";
-
-  return (
-    <div>
-      <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
-        <span>Trò chơi trên lớp</span>
-        <Gamepad2 className="w-3.5 h-3.5" />
-      </div>
-      <nav className="space-y-1">
-        {gamesNav.map((item) => {
-          const isActive = item.mode 
-            ? isGamesPath && currentMode === item.mode
-            : isGamesPath && (!currentMode || currentMode === "race");
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={`
-                flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors
-                ${isActive 
-                  ? item.activeBg
-                  : "text-foreground/80 hover:bg-muted hover:text-foreground"
-                }
-              `}
-            >
-              <div className="flex items-center gap-3">
-                <Icon className={`w-4 h-4 ${isActive ? item.iconColor : "text-muted-foreground"}`} />
-                <span>{item.name}</span>
-              </div>
-              {item.tag && !isActive && (
-                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-sm bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                  {item.tag}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
-  );
-}
-
 export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps) {
   const pathname = usePathname();
 
@@ -116,9 +35,10 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
     { name: "Đề thi của tôi", href: "/teacher/exams", icon: FileText },
     { name: "Lớp học & Sổ điểm", href: "/teacher/classes", icon: Users },
     { name: "Chấm phiếu OMR", href: "/teacher/omr", icon: Camera },
-    { name: "Giáo án NLS", href: "/teacher/lesson-plans", icon: BookOpen, tag: "MỚI" },
     { name: "Báo cáo năng lực", href: "/teacher/reports", icon: BarChart3 },
   ];
+
+  const isGamesActive = pathname.startsWith("/teacher/games");
 
   return (
     <>
@@ -207,9 +127,33 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
             </nav>
           </div>
 
-          <Suspense fallback={<div className="h-24 animate-pulse bg-muted/40 rounded-xl" />}>
-            <GamesNavSection pathname={pathname} onClose={onClose} />
-          </Suspense>
+          <div>
+            <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
+              <span>Trò chơi trên lớp</span>
+              <Gamepad2 className="w-3.5 h-3.5" />
+            </div>
+            <nav className="space-y-1">
+              <Link
+                href="/teacher/games"
+                onClick={onClose}
+                className={`
+                  flex items-center justify-between px-3 py-2.5 rounded-lg font-medium transition-colors
+                  ${isGamesActive 
+                    ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold" 
+                    : "text-foreground/80 hover:bg-muted hover:text-foreground"
+                  }
+                `}
+              >
+                <div className="flex items-center gap-3">
+                  <Gamepad2 className={`w-4 h-4 ${isGamesActive ? "text-blue-600 dark:text-blue-400" : "text-amber-500"}`} />
+                  <span>Game lớp học</span>
+                </div>
+                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-sm bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  MỚI
+                </span>
+              </Link>
+            </nav>
+          </div>
         </div>
 
         {/* Footer info / settings */}

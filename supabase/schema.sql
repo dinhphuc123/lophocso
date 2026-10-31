@@ -69,3 +69,15 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.game_rooms;
 CREATE INDEX IF NOT EXISTS idx_submissions_exam_id ON public.submissions(exam_id);
 CREATE INDEX IF NOT EXISTS idx_exams_created_at ON public.exams(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_game_rooms_state ON public.game_rooms(state);
+
+-- 5. Bảng Hồ sơ & Bảo mật Giáo viên (Teacher Profile)
+CREATE TABLE IF NOT EXISTS public.teacher_profile (
+    id TEXT PRIMARY KEY DEFAULT 'default_teacher',
+    name TEXT DEFAULT 'Thầy/Cô Giáo',
+    school TEXT DEFAULT 'Trường THPT',
+    subject TEXT DEFAULT 'Toán học',
+    email TEXT DEFAULT 'giaovien@khaothiso.vn',
+    password_hash TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
