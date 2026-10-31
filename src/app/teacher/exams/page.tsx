@@ -23,7 +23,8 @@ import {
   CheckCircle2,
   QrCode,
   Share2,
-  Edit3
+  Edit3,
+  Activity
 } from "lucide-react";
 import { Exam, ClassRoom } from "@/lib/types";
 
@@ -334,10 +335,11 @@ export default function ExamsListPage() {
                 <div className="flex items-center gap-1.5">
                   <Link
                     href={`/teacher/exams/${exam.id}/results`}
-                    className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 hover:bg-blue-100 text-xs font-semibold flex items-center gap-1 transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 hover:bg-blue-100 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    title="Xem sổ điểm và giám sát học sinh đang online làm bài trực tiếp"
                   >
-                    <CheckSquare className="w-3.5 h-3.5" />
-                    <span>Sổ điểm</span>
+                    <Activity className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Giám sát &amp; Điểm</span>
                   </Link>
 
                   <button

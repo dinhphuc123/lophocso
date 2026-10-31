@@ -17,14 +17,20 @@ export function LiveMonitorSection() {
   const [students, setStudents] = useState<LiveStudent[]>([]);
 
   useEffect(() => {
-    fetch("/api/stats")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.stats?.liveSessions?.length > 0) {
-          setStudents(data.stats.liveSessions);
-        }
-      })
-      .catch(() => {});
+    const fetchLive = () => {
+      fetch("/api/stats")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.stats?.liveSessions) {
+            setStudents(data.stats.liveSessions);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchLive();
+    const interval = setInterval(fetchLive, 8_000);
+    return () => clearInterval(interval);
   }, []);
 
   return (

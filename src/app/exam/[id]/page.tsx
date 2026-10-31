@@ -71,6 +71,28 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasStarted, result, timeLeft]);
 
+  // Periodic heartbeat to report live online status and answering progress
+  useEffect(() => {
+    if (!hasStarted || result) return;
+
+    const sendHeartbeat = () => {
+      fetch(`/api/exams/${examId}/heartbeat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentName,
+          studentClass,
+          answeredCount: Object.keys(answers).length,
+          totalQuestions: exam?.questions?.length || 0,
+        }),
+      }).catch(() => {});
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 15_000);
+    return () => clearInterval(interval);
+  }, [hasStarted, result, examId, studentName, studentClass, answers, exam?.questions?.length]);
+
   const handleStartExam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentName.trim()) return;

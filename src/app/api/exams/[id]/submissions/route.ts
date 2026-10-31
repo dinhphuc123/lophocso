@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSubmissions, getExamById } from "@/lib/db";
+import { getSubmissions, getExamById, getActiveAttempts } from "@/lib/db";
 import { teacherOnly } from "@/lib/auth";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -11,7 +11,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!exam) {
       return NextResponse.json({ success: false, error: "Đề thi không tồn tại" }, { status: 404 });
     }
-    return NextResponse.json({ success: true, exam, submissions: getSubmissions(id) });
+    return NextResponse.json({ 
+      success: true, 
+      exam, 
+      submissions: getSubmissions(id),
+      activeAttempts: getActiveAttempts(id)
+    });
   } catch (err: unknown) {
     const error = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ success: false, error }, { status: 500 });

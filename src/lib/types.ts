@@ -90,6 +90,9 @@ export interface Attempt {
   studentName: string;
   studentClass: string;
   startedAt: string;
+  lastActiveAt?: string;
+  answeredCount?: number;
+  totalQuestions?: number;
   submitted: boolean;
 }
 

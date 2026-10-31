@@ -92,6 +92,18 @@ export function getSubmissions(examId?: string): StudentSubmission[] {
 const attemptKey = (name: string, cls: string) =>
   `${name.trim().toLowerCase().replace(/\s+/g, " ")}|${cls.trim().toLowerCase()}`;
 
+// In-memory hot store for real-time online status
+declare global {
+  var __activeExamAttempts: Map<string, Attempt> | undefined;
+}
+
+const getHotAttempts = (): Map<string, Attempt> => {
+  if (!globalThis.__activeExamAttempts) {
+    globalThis.__activeExamAttempts = new Map<string, Attempt>();
+  }
+  return globalThis.__activeExamAttempts;
+};
+
 /** Starts (or resumes) a student's attempt. The server clock owns startedAt. */
 export function startAttempt(
   examId: string,
@@ -100,20 +112,92 @@ export function startAttempt(
 ): { attempt: Attempt; resumed: boolean } | { error: "submitted" } {
   const db = readDb();
   const key = attemptKey(name, cls);
+  const hotKey = `${examId}:${key}`;
+  const hot = getHotAttempts();
+
   const found = db.attempts.find((a) => a.examId === examId && a.key === key);
   if (found?.submitted) return { error: "submitted" };
-  if (found) return { attempt: found, resumed: true };
+  if (found) {
+    found.lastActiveAt = new Date().toISOString();
+    hot.set(hotKey, found);
+    return { attempt: found, resumed: true };
+  }
   const attempt: Attempt = {
     examId,
     key,
     studentName: name.trim(),
     studentClass: cls.trim(),
     startedAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(),
+    answeredCount: 0,
     submitted: false,
   };
   db.attempts.push(attempt);
   writeDb(db);
+  hot.set(hotKey, attempt);
   return { attempt, resumed: false };
+}
+
+export function recordHeartbeat(
+  examId: string,
+  name: string,
+  cls: string,
+  answeredCount?: number,
+  totalQuestions?: number
+): Attempt | undefined {
+  const key = attemptKey(name, cls);
+  const hotKey = `${examId}:${key}`;
+  const hot = getHotAttempts();
+
+  const db = readDb();
+  let attempt = db.attempts.find((a) => a.examId === examId && a.key === key);
+
+  const nowIso = new Date().toISOString();
+  if (attempt) {
+    attempt.lastActiveAt = nowIso;
+    if (typeof answeredCount === "number") attempt.answeredCount = answeredCount;
+    if (typeof totalQuestions === "number") attempt.totalQuestions = totalQuestions;
+    writeDb(db);
+  } else {
+    attempt = hot.get(hotKey) || {
+      examId,
+      key,
+      studentName: name.trim(),
+      studentClass: cls.trim(),
+      startedAt: nowIso,
+      lastActiveAt: nowIso,
+      answeredCount,
+      totalQuestions,
+      submitted: false,
+    };
+  }
+
+  hot.set(hotKey, { ...attempt, lastActiveAt: nowIso, answeredCount, totalQuestions });
+  return attempt;
+}
+
+export function getActiveAttempts(examId?: string): Attempt[] {
+  const { attempts: diskAttempts, exams } = readDb();
+  const now = Date.now();
+  const hot = getHotAttempts();
+
+  const allMap = new Map<string, Attempt>();
+  for (const a of diskAttempts) {
+    allMap.set(`${a.examId}:${a.key}`, a);
+  }
+  for (const [k, a] of hot.entries()) {
+    allMap.set(k, { ...allMap.get(k), ...a });
+  }
+
+  return Array.from(allMap.values()).filter((a) => {
+    if (a.submitted) return false;
+    if (examId && a.examId !== examId) return false;
+    const exam = exams.find((e) => e.id === a.examId);
+    const limit = ((exam?.durationMinutes ?? 45) + 15) * 60_000;
+    const startedMs = Date.parse(a.startedAt);
+    const lastActiveMs = a.lastActiveAt ? Date.parse(a.lastActiveAt) : startedMs;
+    return now - startedMs < limit && now - lastActiveMs < 5 * 60_000;
+  });
 }
 
 export function getAttempt(examId: string, name: string, cls: string): Attempt | undefined {
@@ -127,6 +211,7 @@ export function saveSubmission(submission: StudentSubmission): StudentSubmission
   const key = attemptKey(submission.studentName, submission.studentClass);
   const attempt = db.attempts.find((a) => a.examId === submission.examId && a.key === key);
   if (attempt) attempt.submitted = true;
+  getHotAttempts().delete(`${submission.examId}:${key}`);
   writeDb(db);
   return submission;
 }
@@ -207,23 +292,22 @@ export function getDashboardStats(): DashboardStats {
       totalAnswers: x.total,
     }));
 
-  const active = attempts.filter((a) => {
-    const exam = exams.find((e) => e.id === a.examId);
-    const limit = ((exam?.durationMinutes ?? 45) + 5) * 60_000;
-    return !a.submitted && now - Date.parse(a.startedAt) < limit;
-  }).length;
+  const onlineAttempts = getActiveAttempts();
+  const active = onlineAttempts.length;
 
-  const activeAttempts = attempts
-    .filter((a) => !a.submitted)
-    .slice(-3)
+  const activeAttempts = onlineAttempts
+    .slice(-5)
     .map((a) => {
       const exam = exams.find((e) => e.id === a.examId);
       const elapsedMin = Math.max(1, Math.floor((now - Date.parse(a.startedAt)) / 60_000));
+      const answered = typeof a.answeredCount === "number" && a.totalQuestions 
+        ? `${a.answeredCount}/${a.totalQuestions} câu` 
+        : `${elapsedMin}p`;
       return {
         name: a.studentName,
         class: a.studentClass,
         exam: exam?.title || "Đề thi trực tuyến",
-        progress: `Đang làm (${elapsedMin}p)`,
+        progress: `Đang làm (${answered})`,
         time: `${elapsedMin} phút trước`,
         status: "active" as const,
       };

@@ -2,14 +2,16 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, Users, ChevronRight, AlertCircle, Download, Check } from "lucide-react";
-import { Exam, StudentSubmission } from "@/lib/types";
+import { ArrowLeft, Copy, Users, ChevronRight, AlertCircle, Download, Check, RotateCcw, Activity, Clock } from "lucide-react";
+import { Exam, StudentSubmission, Attempt } from "@/lib/types";
 
 export default function ExamResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: examId } = use(params);
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
+  const [activeAttempts, setActiveAttempts] = useState<Attempt[]>([]);
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [selectedSub, setSelectedSub] = useState<StudentSubmission | null>(null);
@@ -18,17 +20,25 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
   const [manualGrades, setManualGrades] = useState<Record<string, { points: number; feedback: string }>>({});
   const [isSavingGrade, setIsSavingGrade] = useState(false);
 
-  useEffect(() => {
+  const fetchData = () => {
     fetch(`/api/exams/${examId}/submissions`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
           setExam(data.exam);
           setSubmissions(data.submissions || []);
+          setActiveAttempts(data.activeAttempts || []);
         }
       })
       .finally(() => setLoading(false));
-  }, [examId]);
+  };
+
+  useEffect(() => {
+    fetchData();
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [examId, autoRefresh]);
 
   const copyLink = () => {
     const url = `${window.location.origin}/exam/${examId}`;
@@ -147,27 +157,169 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* Mini Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl border border-border bg-card">
-          <div className="text-xs font-medium text-muted-foreground">Tổng số bài nộp</div>
+          <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${activeAttempts.length > 0 ? "bg-emerald-500 animate-ping" : "bg-muted-foreground"}`} />
+            <span>Đang online làm bài</span>
+          </div>
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1 flex items-baseline gap-2">
+            <span>{activeAttempts.length}</span>
+            <span className="text-xs font-normal text-muted-foreground">học sinh</span>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl border border-border bg-card">
+          <div className="text-xs font-medium text-muted-foreground">Tổng bài đã nộp</div>
           <div className="text-2xl font-black text-foreground mt-1 flex items-baseline gap-2">
             <span>{submissions.length}</span>
             <span className="text-xs font-normal text-muted-foreground">học sinh</span>
           </div>
         </div>
+
         <div className="p-4 rounded-xl border border-border bg-card">
           <div className="text-xs font-medium text-muted-foreground">Điểm trung bình</div>
-          <div className="text-2xl font-black text-blue-600 mt-1 flex items-baseline gap-2">
+          <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1 flex items-baseline gap-2">
             <span>{avgScore}</span>
             <span className="text-xs font-normal text-muted-foreground">/ 10</span>
           </div>
         </div>
+
         <div className="p-4 rounded-xl border border-border bg-card">
-          <div className="text-xs font-medium text-muted-foreground">Tỷ lệ hoàn thành</div>
-          <div className="text-2xl font-black text-emerald-600 mt-1">
-            {submissions.length > 0 ? "100%" : "0%"}
+          <div className="text-xs font-medium text-muted-foreground">Tỷ lệ Đạt (≥ 5.0)</div>
+          <div className="text-2xl font-black text-foreground mt-1">
+            {submissions.length > 0
+              ? `${Math.round((submissions.filter((s) => s.score >= 5).length / submissions.length) * 100)}%`
+              : "0%"}
           </div>
         </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* SECTION: HỌC SINH ĐANG LÀM BÀI TRỰC TIẾP (LIVE MONITOR)   */}
+      {/* ========================================================= */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/20">
+          <div className="flex items-center gap-2.5">
+            <div className="relative">
+              <div className={`w-3 h-3 rounded-full ${activeAttempts.length > 0 ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+              {activeAttempts.length > 0 && (
+                <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+              )}
+            </div>
+            <div>
+              <h3 className="font-bold text-sm sm:text-base text-foreground flex items-center gap-2">
+                <span>Học sinh đang online làm đề</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${activeAttempts.length > 0 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "bg-muted text-muted-foreground"}`}>
+                  {activeAttempts.length} em đang làm bài
+                </span>
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                Tự động cập nhật trực tiếp tiến độ trả lời câu hỏi và trạng thái mạng của học sinh
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                autoRefresh
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800"
+                  : "border-border bg-background text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${autoRefresh ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />
+              <span>{autoRefresh ? "Tự làm mới (5s)" : "Tự làm mới: Tắt"}</span>
+            </button>
+            <button
+              onClick={fetchData}
+              className="p-1.5 rounded-lg border border-border hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Làm mới ngay"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {activeAttempts.length === 0 ? (
+          <div className="p-8 text-center text-xs text-muted-foreground">
+            Hiện chưa có học sinh nào đang mở làm bài thi này. Hãy chia sẻ link đề thi cho học sinh để theo dõi thời gian thực!
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-muted/40 border-b border-border text-muted-foreground uppercase text-[10px] font-semibold">
+                <tr>
+                  <th className="p-3 pl-4">#</th>
+                  <th className="p-3">Học sinh</th>
+                  <th className="p-3">Lớp</th>
+                  <th className="p-3">Bắt đầu lúc</th>
+                  <th className="p-3">Tiến độ câu hỏi</th>
+                  <th className="p-3">Thời gian đã làm</th>
+                  <th className="p-3 pr-4 text-right">Trạng thái kết nối</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {activeAttempts.map((att, idx) => {
+                  const now = Date.now();
+                  const startedMs = Date.parse(att.startedAt);
+                  const lastActiveMs = att.lastActiveAt ? Date.parse(att.lastActiveAt) : startedMs;
+                  const elapsedMin = Math.max(0, Math.floor((now - startedMs) / 60_000));
+                  const isRecentlyActive = now - lastActiveMs < 60_000;
+                  const totalQ = att.totalQuestions || exam.questions.length;
+                  const answered = att.answeredCount || 0;
+                  const progressPct = totalQ > 0 ? Math.min(100, Math.round((answered / totalQ) * 100)) : 0;
+
+                  return (
+                    <tr key={att.key || idx} className="hover:bg-muted/30 transition-colors">
+                      <td className="p-3 pl-4 text-muted-foreground font-mono font-bold">#{idx + 1}</td>
+                      <td className="p-3 font-bold text-foreground">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-black">
+                            {att.studentName.split(" ").slice(-1)[0][0]}
+                          </div>
+                          <span>{att.studentName}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 font-semibold text-foreground">{att.studentClass || "Tự do"}</td>
+                      <td className="p-3 text-muted-foreground text-[11px]">
+                        {new Date(att.startedAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                      </td>
+                      <td className="p-3">
+                        <div className="w-36 space-y-1">
+                          <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground">
+                            <span>{answered}/{totalQ} câu</span>
+                            <span>{progressPct}%</span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-muted-foreground">
+                        {elapsedMin} phút
+                      </td>
+                      <td className="p-3 pr-4 text-right">
+                        {isRecentlyActive ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Đang làm bài</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                            <span>Mất kết nối tạm thời</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Submissions Table */}
