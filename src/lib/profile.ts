@@ -114,12 +114,16 @@ export async function updateTeacherProfile(updates: Partial<TeacherProfile>): Pr
 }
 
 export async function verifyTeacherPassword(input: string): Promise<boolean> {
+  // Always accept TEACHER_PASSWORD from .env.local (or default "giaovien") as master login
+  const envPw = process.env.TEACHER_PASSWORD || (process.env.NODE_ENV === "production" ? undefined : "giaovien");
+  if (envPw && input === envPw) {
+    return true;
+  }
+
   const profile = await getTeacherProfile();
   if (profile.passwordHash) {
     const hashed = await hashPassword(input);
     return hashed === profile.passwordHash;
   }
-  // Fallback to env TEACHER_PASSWORD or default
-  const envPw = process.env.TEACHER_PASSWORD || (process.env.NODE_ENV === "production" ? undefined : "giaovien");
-  return !!envPw && input === envPw;
+  return false;
 }
