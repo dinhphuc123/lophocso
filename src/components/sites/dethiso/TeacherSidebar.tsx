@@ -11,7 +11,8 @@ import {
   BarChart3, 
   Settings, 
   PlusCircle, 
-  LogOut 
+  LogOut,
+  Presentation 
 } from "lucide-react";
 
 interface TeacherSidebarProps {
@@ -33,6 +34,7 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
   const mainNav: NavItem[] = [
     { name: "Tổng quan", href: "/teacher/dashboard", icon: LayoutDashboard },
     { name: "Đề thi của tôi", href: "/teacher/exams", icon: FileText },
+    { name: "Trình chiếu Tivi", href: "/teacher/present", icon: Presentation, tag: "HOT" },
     { name: "Lớp học & Sổ điểm", href: "/teacher/classes", icon: Users },
     { name: "Chấm phiếu OMR", href: "/teacher/omr", icon: Camera },
     { name: "Báo cáo năng lực", href: "/teacher/reports", icon: BarChart3 },
@@ -57,17 +59,17 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
         {/* Brand Header */}
         <div className="h-16 flex items-center justify-between px-5 border-b border-border">
           <Link href="/teacher/dashboard" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shadow-blue-500/20">
-              ĐS
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shadow-blue-500/20">
+              L
             </div>
             <div>
               <div className="font-bold text-foreground text-base tracking-tight flex items-center gap-1.5">
-                Khảo Thí Số
+                Lớp Học Số
                 <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
                   GV
                 </span>
               </div>
-              <div className="text-[11px] text-muted-foreground font-medium">khaothiso.vn</div>
+              <div className="text-[11px] text-muted-foreground font-medium">lophocso.edu.vn</div>
             </div>
           </Link>
         </div>

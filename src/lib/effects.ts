@@ -3,6 +3,8 @@
 // Web Audio API & Canvas Confetti with 0 dependencies.
 let audioCtx: AudioContext | null = null;
 let isMuted = false;
+let currentBgmInterval: ReturnType<typeof setInterval> | null = null;
+let currentBgmOscillators: OscillatorNode[] = [];
 
 function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -18,6 +20,111 @@ function getAudioContext(): AudioContext | null {
 
 export function setSoundMuted(muted: boolean) {
   isMuted = muted;
+  if (muted) stopBgm();
+}
+
+export function stopBgm() {
+  if (currentBgmInterval) {
+    clearInterval(currentBgmInterval);
+    currentBgmInterval = null;
+  }
+  for (const osc of currentBgmOscillators) {
+    try {
+      osc.stop();
+      osc.disconnect();
+    } catch {
+      // ignore
+    }
+  }
+  currentBgmOscillators = [];
+}
+
+/** Upbeat chill loop for classroom lobby waiting */
+export function playLobbyBgm() {
+  stopBgm();
+  if (isMuted) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const notes = [
+    { freq: 261.63, len: 0.2 }, // C4
+    { freq: 329.63, len: 0.2 }, // E4
+    { freq: 392.00, len: 0.2 }, // G4
+    { freq: 523.25, len: 0.3 }, // C5
+    { freq: 440.00, len: 0.2 }, // A4
+    { freq: 392.00, len: 0.2 }, // G4
+    { freq: 349.23, len: 0.2 }, // F4
+    { freq: 329.63, len: 0.3 }, // E4
+  ];
+
+  let step = 0;
+  const tick = () => {
+    if (isMuted) return;
+    const item = notes[step % notes.length];
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(item.freq, now);
+
+    gain.gain.setValueAtTime(0.04, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + item.len);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + item.len);
+    step++;
+  };
+
+  tick();
+  currentBgmInterval = setInterval(tick, 350);
+}
+
+/** Ticking tension loop during active countdown */
+export function playCountdownBgm() {
+  stopBgm();
+  if (isMuted) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  let beat = 0;
+  const tick = () => {
+    if (isMuted) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = beat % 2 === 0 ? "triangle" : "sine";
+    osc.frequency.setValueAtTime(beat % 4 === 0 ? 300 : 200, now);
+
+    gain.gain.setValueAtTime(0.06, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.12);
+    beat++;
+  };
+
+  tick();
+  currentBgmInterval = setInterval(tick, 500);
+}
+
+/** Haptic vibration for mobile phones (gentle feedback without classroom noise) */
+export function triggerHaptic(type: "tap" | "correct" | "wrong") {
+  if (typeof window === "undefined" || !("vibrate" in navigator)) return;
+  try {
+    if (type === "tap") navigator.vibrate(15);
+    else if (type === "correct") navigator.vibrate([25, 40, 35]);
+    else if (type === "wrong") navigator.vibrate([60, 50, 60]);
+  } catch {
+    // ignore
+  }
 }
 
 export function getSoundMuted(): boolean {

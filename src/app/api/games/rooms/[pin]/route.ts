@@ -26,8 +26,8 @@ export async function POST(
     const { action } = body;
 
     if (action === "join") {
-      const { playerName, playerId } = body;
-      const res = await joinGameRoom(pin, playerName, playerId);
+      const { playerName, avatar, playerId } = body;
+      const res = await joinGameRoom(pin, playerName, avatar, playerId);
       return NextResponse.json({
         success: true,
         player: res.player,

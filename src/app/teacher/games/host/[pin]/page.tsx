@@ -14,11 +14,16 @@ import {
   Volume2,
   VolumeX,
   Camera,
-  Printer
+  Printer,
+  Download,
+  Award,
+  BookOpen,
+  X
 } from "lucide-react";
 import { RoomView, PlayerView } from "@/lib/game-store";
 import { MathText } from "@/components/MathText";
-import { playSfx, launchConfetti, setSoundMuted } from "@/lib/effects";
+import { playSfx, launchConfetti, setSoundMuted, playLobbyBgm, playCountdownBgm, stopBgm } from "@/lib/effects";
+import { getAvatarInfo } from "@/lib/avatars";
 
 export default function GameHostPage({ params }: { params: Promise<{ pin: string }> }) {
   const { pin } = use(params);
@@ -28,16 +33,46 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
 
+  // Bonus points & export modal states
+  const [showBonusModal, setShowBonusModal] = useState(false);
+  const [availableClasses, setAvailableClasses] = useState<string[]>([]);
+  const [selectedClass, setSelectedClass] = useState("");
+  const [top1Bonus, setTop1Bonus] = useState(2.0);
+  const [top2Bonus, setTop2Bonus] = useState(1.5);
+  const [top3Bonus, setTop3Bonus] = useState(1.0);
+  const [otherBonus, setOtherBonus] = useState(0.5);
+  const [isSavingBonus, setIsSavingBonus] = useState(false);
+  const [bonusSuccess, setBonusSuccess] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/classes")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success && Array.isArray(d.classes)) {
+          const names = d.classes.map((c: { name: string }) => c.name);
+          setAvailableClasses(names);
+          if (names.length > 0) setSelectedClass(names[0]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const prevRoomState = useRef<string | null>(null);
   const prevBossHp = useRef<number | null>(null);
 
   // Sound & FX transitions
   useEffect(() => {
     if (!room) return;
-    if (prevRoomState.current && prevRoomState.current !== room.state) {
-      if (room.state === "reveal") {
+    if (prevRoomState.current !== room.state) {
+      if (room.state === "lobby") {
+        playLobbyBgm();
+      } else if (room.state === "question") {
+        playCountdownBgm();
+      } else if (room.state === "reveal") {
+        stopBgm();
         playSfx(room.mode === "bomb" ? "explosion" : "correct");
       } else if (room.state === "ended") {
+        stopBgm();
         playSfx("victory");
         launchConfetti(4500);
       }
@@ -50,10 +85,86 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
     prevBossHp.current = room.bossHp;
   }, [room]);
 
+  useEffect(() => {
+    return () => {
+      stopBgm();
+    };
+  }, []);
+
   const toggleSound = () => {
     const next = !isMuted;
     setIsMuted(next);
     setSoundMuted(next);
+  };
+
+  const downloadMatchExcel = () => {
+    if (!room) return;
+    const sorted = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
+    const rows = [
+      ["Hạng", "Tên học sinh", "Linh vật", "Điểm số", "Chuỗi đúng cao nhất", "Số mạng còn lại"],
+      ...sorted.map((p, idx) => [
+        idx + 1,
+        p.name,
+        getAvatarInfo(p.avatar).name,
+        p.score,
+        p.streak,
+        p.lives ?? 3,
+      ]),
+    ];
+    const csvContent = "\uFEFF" + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Bang_diem_game_${room.examTitle.replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]/g, "_")}_PIN_${pin}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSaveBonusPoints = async () => {
+    if (!room || !selectedClass) return;
+    setIsSavingBonus(true);
+    try {
+      const sorted = Object.values(room.players || {}).sort((a, b) => b.score - a.score);
+      const payloadPlayers = sorted.map((p, idx) => {
+        const rank = idx + 1;
+        let bonus = otherBonus;
+        if (rank === 1) bonus = top1Bonus;
+        else if (rank === 2) bonus = top2Bonus;
+        else if (rank === 3) bonus = top3Bonus;
+        return {
+          name: p.name,
+          bonusScore: bonus,
+          gameScore: p.score,
+          rank,
+        };
+      });
+
+      const res = await fetch("/api/games/bonus-points", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          className: selectedClass,
+          gameTitle: room.examTitle,
+          players: payloadPlayers,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setBonusSuccess(true);
+        setTimeout(() => {
+          setShowBonusModal(false);
+          setBonusSuccess(false);
+        }, 1500);
+      } else {
+        alert(data.error || "Không thể cộng điểm");
+      }
+    } catch {
+      alert("Lỗi kết nối máy chủ");
+    } finally {
+      setIsSavingBonus(false);
+    }
   };
 
   // Real-time SSE with polling fallback
@@ -255,15 +366,18 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
               </div>
             ) : (
               <div className="flex flex-wrap items-center justify-center gap-2.5 max-h-48 overflow-y-auto p-2">
-                {playersList.map((p) => (
-                  <div
-                    key={p.id}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-200 flex items-center gap-2 shadow-xs"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span>{p.name}</span>
-                  </div>
-                ))}
+                {playersList.map((p) => {
+                  const av = getAvatarInfo(p.avatar);
+                  return (
+                    <div
+                      key={p.id}
+                      className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs font-bold text-slate-100 flex items-center gap-2 shadow-md animate-in fade-in zoom-in-95 duration-200"
+                    >
+                      <span className="text-base">{av.emoji}</span>
+                      <span>{p.name}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -608,6 +722,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
         {/* Top 2: Silver */}
         {top2 && (
           <div className="flex-1 flex flex-col items-center space-y-2">
+            <span className="text-3xl animate-bounce">{getAvatarInfo(top2.avatar).emoji}</span>
             <div className="text-xs font-bold text-slate-300 line-clamp-1">{top2.name}</div>
             <div className="text-xs font-mono text-amber-300">{top2.score} đ</div>
             <div className="w-full h-32 bg-gradient-to-t from-slate-800 to-slate-700 rounded-t-2xl border-t-4 border-slate-400 flex items-center justify-center font-black text-2xl text-slate-300 shadow-lg">
@@ -620,6 +735,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
         {top1 && (
           <div className="flex-1 flex flex-col items-center space-y-2 relative -top-6">
             <Crown className="w-8 h-8 text-amber-400 animate-bounce" />
+            <span className="text-4xl animate-pulse">{getAvatarInfo(top1.avatar).emoji}</span>
             <div className="text-sm font-black text-amber-300 line-clamp-1">{top1.name}</div>
             <div className="text-xs font-mono text-amber-200 font-bold">{top1.score} đ</div>
             <div className="w-full h-44 bg-gradient-to-t from-amber-600 to-amber-500 rounded-t-2xl border-t-4 border-amber-300 flex items-center justify-center font-black text-4xl text-white shadow-xl shadow-amber-500/20">
@@ -631,6 +747,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
         {/* Top 3: Bronze */}
         {top3 && (
           <div className="flex-1 flex flex-col items-center space-y-2">
+            <span className="text-3xl animate-bounce">{getAvatarInfo(top3.avatar).emoji}</span>
             <div className="text-xs font-bold text-amber-700 line-clamp-1">{top3.name}</div>
             <div className="text-xs font-mono text-amber-300">{top3.score} đ</div>
             <div className="w-full h-24 bg-gradient-to-t from-amber-950 to-amber-900 rounded-t-2xl border-t-4 border-amber-700 flex items-center justify-center font-black text-2xl text-amber-600 shadow-lg">
@@ -644,46 +761,190 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
       <div className="max-w-xl mx-auto w-full rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-2">
         <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Bảng tổng sắp toàn lớp:</h3>
         <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-          {playersList.map((p, idx) => (
-            <div
-              key={p.id}
-              className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs"
-            >
-              <div className="flex items-center gap-2">
-                <span className="w-5 text-center font-bold text-slate-400">#{idx + 1}</span>
-                <span className="font-semibold text-slate-200">{p.name}</span>
-                {room.mode === "bomb" && (
-                  <span className="flex items-center text-rose-400 text-[10px]">
-                    <Heart className="w-3 h-3 fill-rose-500 inline mr-0.5" /> {p.lives}
-                  </span>
-                )}
-                {room.mode === "farm" && (
-                  <span className="text-emerald-400 text-[10px]">
-                    🌾 {p.crops}
-                  </span>
-                )}
+          {playersList.map((p, idx) => {
+            const av = getAvatarInfo(p.avatar);
+            return (
+              <div
+                key={p.id}
+                className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-5 text-center font-bold text-slate-400">#{idx + 1}</span>
+                  <span className="text-base">{av.emoji}</span>
+                  <span className="font-semibold text-slate-200">{p.name}</span>
+                  {room.mode === "bomb" && (
+                    <span className="flex items-center text-rose-400 text-[10px]">
+                      <Heart className="w-3 h-3 fill-rose-500 inline mr-0.5" /> {p.lives}
+                    </span>
+                  )}
+                  {room.mode === "farm" && (
+                    <span className="text-emerald-400 text-[10px]">
+                      🌾 {p.crops}
+                    </span>
+                  )}
+                </div>
+                <span className="font-mono font-bold text-amber-400">{p.score} điểm</span>
               </div>
-              <span className="font-mono font-bold text-amber-400">{p.score} điểm</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-center gap-4 pt-4">
+      <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+        <button
+          type="button"
+          onClick={() => setShowBonusModal(true)}
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-xs font-bold text-white transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+        >
+          <Award className="w-4 h-4" />
+          <span>Cộng điểm vào Sổ điểm lớp</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={downloadMatchExcel}
+          className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-colors cursor-pointer flex items-center gap-2 border border-slate-700"
+        >
+          <Download className="w-4 h-4" />
+          <span>Tải kết quả (Excel)</span>
+        </button>
+
         <Link
           href="/teacher/games"
-          className="px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition-colors"
+          className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition-colors"
         >
           Trận đấu mới
         </Link>
         <Link
           href="/teacher/exams"
-          className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-bold text-white transition-colors"
+          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-bold text-white transition-colors"
         >
           Về kho đề thi
         </Link>
       </div>
+
+      {/* Bonus Points Modal */}
+      {showBonusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-left space-y-4 p-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-emerald-400" />
+                <h3 className="font-bold text-sm text-white">Cộng điểm thưởng vào Sổ điểm lớp</h3>
+              </div>
+              <button
+                onClick={() => setShowBonusModal(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {bonusSuccess ? (
+              <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-800 text-center space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                <div className="font-bold text-sm text-emerald-300">Đã cộng điểm vào Sổ điểm thành công!</div>
+                <p className="text-xs text-emerald-400/80">Điểm đã được ghi nhận trong danh sách lớp {selectedClass}.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs text-slate-300">
+                <div className="space-y-1.5">
+                  <label className="font-bold text-white">1. Chọn lớp học nhận điểm:</label>
+                  {availableClasses.length > 0 ? (
+                    <select
+                      value={selectedClass}
+                      onChange={(e) => setSelectedClass(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-semibold focus:outline-none focus:border-emerald-500"
+                    >
+                      {availableClasses.map((cls) => (
+                        <option key={cls} value={cls}>
+                          Lớp {cls}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="text-slate-400 italic">Chưa có lớp nào trong danh mục lớp học.</div>
+                  )}
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <label className="font-bold text-white">2. Mức điểm thưởng (thang 10):</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                      <span className="text-[11px] text-amber-400 font-bold">🥇 Hạng 1 (Top 1)</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="10"
+                        value={top1Bonus}
+                        onChange={(e) => setTop1Bonus(Number(e.target.value))}
+                        className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white font-mono font-bold"
+                      />
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                      <span className="text-[11px] text-slate-300 font-bold">🥈 Hạng 2 (Top 2)</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="10"
+                        value={top2Bonus}
+                        onChange={(e) => setTop2Bonus(Number(e.target.value))}
+                        className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white font-mono font-bold"
+                      />
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                      <span className="text-[11px] text-amber-600 font-bold">🥉 Hạng 3 (Top 3)</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="10"
+                        value={top3Bonus}
+                        onChange={(e) => setTop3Bonus(Number(e.target.value))}
+                        className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white font-mono font-bold"
+                      />
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                      <span className="text-[11px] text-slate-400 font-bold">🎖️ Học sinh còn lại</span>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        max="10"
+                        value={otherBonus}
+                        onChange={(e) => setOtherBonus(Number(e.target.value))}
+                        className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-white font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowBonusModal(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSavingBonus || !selectedClass}
+                    onClick={handleSaveBonusPoints}
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {isSavingBonus ? <Sparkles className="w-3.5 h-3.5 animate-spin" /> : null}
+                    <span>Xác nhận cộng điểm</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

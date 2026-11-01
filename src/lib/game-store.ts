@@ -23,6 +23,7 @@ const TIME_LIMIT: Record<GameMode, number> = {
 export interface GamePlayer {
   id: string;
   name: string;
+  avatar?: string;
   score: number;
   streak: number;
   lives: number;
@@ -48,7 +49,7 @@ export interface GameRoom {
   createdAt: number;
 }
 
-export interface PlayerView extends Pick<GamePlayer, "id" | "name" | "score" | "streak" | "lives" | "crops"> {
+export interface PlayerView extends Pick<GamePlayer, "id" | "name" | "avatar" | "score" | "streak" | "lives" | "crops"> {
   answered: boolean;
   lastCorrect?: boolean;
   lastEarned?: number;
@@ -181,6 +182,7 @@ export function viewRoom(room: GameRoom): RoomView {
     .map<PlayerView>((p) => ({
       id: p.id,
       name: p.name,
+      avatar: p.avatar || "fox",
       score: p.score,
       streak: p.streak,
       lives: p.lives,
@@ -224,12 +226,20 @@ export function viewRoom(room: GameRoom): RoomView {
   };
 }
 
-export async function joinGameRoom(pin: string, playerName: string, existingId?: string): Promise<{ player: GamePlayer; room: GameRoom }> {
+export async function joinGameRoom(
+  pin: string, 
+  playerName: string, 
+  avatar?: string, 
+  existingId?: string
+): Promise<{ player: GamePlayer; room: GameRoom }> {
   const room = await getGameRoom(pin);
   if (!room || room.state === "ended") throw new Error("Phòng thi không tồn tại hoặc đã kết thúc");
 
   // a refresh / reconnect keeps the same player instead of creating a duplicate
-  if (existingId && room.players[existingId]) return { player: room.players[existingId], room };
+  if (existingId && room.players[existingId]) {
+    if (avatar && !room.players[existingId].avatar) room.players[existingId].avatar = avatar;
+    return { player: room.players[existingId], room };
+  }
 
   if (Object.keys(room.players).length >= MAX_PLAYERS) throw new Error("Phòng đã đầy");
   const base = playerName.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 30) || `Học sinh ${Object.keys(room.players).length + 1}`;
@@ -240,6 +250,7 @@ export async function joinGameRoom(pin: string, playerName: string, existingId?:
   const player: GamePlayer = {
     id: `p_${Math.random().toString(36).slice(2, 10)}`,
     name,
+    avatar: avatar || "fox",
     score: 0,
     streak: 0,
     lives: BOMB_LIVES,

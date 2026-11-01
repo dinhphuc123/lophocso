@@ -13,11 +13,13 @@ import {
   Heart
 } from "lucide-react";
 import { RoomView, PlayerView } from "@/lib/game-store";
-import { playSfx, launchConfetti } from "@/lib/effects";
+import { playSfx, launchConfetti, triggerHaptic } from "@/lib/effects";
+import { getAvatarInfo } from "@/lib/avatars";
 
 function PlaySessionContent({ pin }: { pin: string }) {
   const searchParams = useSearchParams();
   const initialName = searchParams.get("name") || "";
+  const initialAvatar = searchParams.get("avatar") || "fox";
 
   const [room, setRoom] = useState<RoomView | null>(null);
   const [player, setPlayer] = useState<PlayerView | null>(null);
@@ -44,6 +46,7 @@ function PlaySessionContent({ pin }: { pin: string }) {
             action: "join",
             playerId: savedId || undefined,
             playerName: initialName || (savedId ? "Học sinh" : `Học sinh ${Math.floor(10 + Math.random() * 90)}`),
+            avatar: initialAvatar,
           }),
         });
         const data = await res.json();
@@ -64,7 +67,7 @@ function PlaySessionContent({ pin }: { pin: string }) {
     };
 
     join();
-  }, [pin, initialName]);
+  }, [pin, initialName, initialAvatar]);
 
   // 2. Real-time updates via SSE with fallback polling
   useEffect(() => {
@@ -160,6 +163,7 @@ function PlaySessionContent({ pin }: { pin: string }) {
   const handleAnswer = async (ans: unknown) => {
     if (!player || !room || hasSubmittedThisQ || room.state !== "question") return;
 
+    triggerHaptic("tap");
     setSelectedAnswer(ans);
     setHasSubmittedThisQ(true);
 
@@ -176,6 +180,9 @@ function PlaySessionContent({ pin }: { pin: string }) {
       });
       const data = await res.json();
       if (data.success && data.room) {
+        if (typeof data.isCorrect === "boolean") {
+          triggerHaptic(data.isCorrect ? "correct" : "wrong");
+        }
         setRoom(data.room);
         const me = data.room.players?.find((p: PlayerView) => p.id === player.id);
         if (me) setPlayer(me);
@@ -215,30 +222,32 @@ function PlaySessionContent({ pin }: { pin: string }) {
   // VIEW: LOBBY
   // ==========================================
   if (room.state === "lobby") {
+    const av = getAvatarInfo(player.avatar);
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-between p-6 text-center">
         <div className="text-xs text-slate-400 font-mono">PIN: {pin}</div>
 
         <div className="space-y-4 my-auto">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 mx-auto flex items-center justify-center text-3xl font-black shadow-xl shadow-amber-500/20">
-            {player.name.charAt(0).toUpperCase()}
+          <div className={`w-24 h-24 rounded-3xl bg-gradient-to-tr ${av.color} mx-auto flex items-center justify-center text-5xl shadow-2xl shadow-amber-500/20 animate-bounce duration-1000`}>
+            {av.emoji}
           </div>
 
           <div className="space-y-1">
             <h2 className="text-2xl font-black text-white">{player.name}</h2>
-            <p className="text-xs text-emerald-400 font-bold flex items-center justify-center gap-1.5">
+            <div className="text-xs text-amber-300 font-semibold">{av.name} · {av.desc}</div>
+            <p className="text-xs text-emerald-400 font-bold flex items-center justify-center gap-1.5 pt-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               <span>Đã vào phòng thi an toàn!</span>
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-400 max-w-xs mx-auto animate-pulse">
-            👀 Hãy nhìn lên màn hình máy chiếu của thầy cô và sẵn sàng nhé!
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-slate-300 max-w-xs mx-auto animate-pulse">
+            👀 Hãy nhìn lên màn hình máy chiếu của Thầy/Cô để theo dõi câu hỏi nhé!
           </div>
         </div>
 
         <div className="text-[11px] text-slate-500">
-          Khảo Thí Số · Game tương tác lớp học
+          Lớp Học Số · Đấu trí tương tác lớp học
         </div>
       </div>
     );

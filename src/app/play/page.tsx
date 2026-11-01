@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Gamepad2, ArrowRight, Sparkles } from "lucide-react";
+import { GAME_AVATARS } from "@/lib/avatars";
 
 export default function PlayIndexPage() {
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [name, setName] = useState("");
+  const [selectedAvatar, setSelectedAvatar] = useState("fox");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -26,22 +28,22 @@ export default function PlayIndexPage() {
     }
 
     setLoading(true);
-    router.push(`/play/${cleanPin}?name=${encodeURIComponent(cleanName)}`);
+    router.push(`/play/${cleanPin}?name=${encodeURIComponent(cleanName)}&avatar=${selectedAvatar}`);
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col justify-center items-center p-4">
-      <div className="max-w-sm w-full space-y-6 text-center">
+      <div className="max-w-md w-full space-y-6 text-center">
         {/* Brand */}
         <div className="space-y-2">
           <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center mx-auto shadow-xl shadow-amber-500/20">
             <Gamepad2 className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white">
-            Khảo Thí Số · Game Lớp Học
+            Lớp Học Số · Đấu Trí Tương Tác
           </h1>
           <p className="text-xs text-slate-400">
-            Nhập mã PIN hiển thị trên màn hình chiếu để tham gia
+            Nhập mã PIN hiển thị trên màn hình chiếu của Thầy/Cô để tham gia
           </p>
         </div>
 
@@ -51,7 +53,8 @@ export default function PlayIndexPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-left">
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+          {/* PIN Input */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
               Mã PIN phòng game:
@@ -67,6 +70,7 @@ export default function PlayIndexPage() {
             />
           </div>
 
+          {/* Name Input */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
               Tên hoặc Biệt danh của em:
@@ -81,6 +85,35 @@ export default function PlayIndexPage() {
             />
           </div>
 
+          {/* Choose Avatar */}
+          <div className="space-y-2 pt-1">
+            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+              <span>Chọn Linh vật đại diện:</span>
+              <span className="text-[11px] text-amber-400 font-normal">
+                {GAME_AVATARS.find((a) => a.id === selectedAvatar)?.name}
+              </span>
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {GAME_AVATARS.map((av) => (
+                <button
+                  key={av.id}
+                  type="button"
+                  onClick={() => setSelectedAvatar(av.id)}
+                  className={`p-2.5 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    selectedAvatar === av.id
+                      ? "border-amber-400 bg-amber-500/20 scale-105 shadow-md shadow-amber-500/20"
+                      : "border-slate-800 bg-slate-900/60 hover:border-slate-700 opacity-75 hover:opacity-100"
+                  }`}
+                >
+                  <span className="text-2xl">{av.emoji}</span>
+                  <span className="text-[10px] font-bold text-slate-300 truncate w-full text-center">
+                    {av.name.split(" ")[0]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -90,7 +123,7 @@ export default function PlayIndexPage() {
               <Sparkles className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <span>Vào phòng ngay</span>
+                <span>Vào phòng thi đấu</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
