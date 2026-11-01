@@ -153,6 +153,16 @@ export default function HomePage() {
           <p className="text-[11px] text-muted-foreground">
             Học sinh có thể click trực tiếp vào đường link hoặc quét mã QR do Thầy/Cô gửi.
           </p>
+
+          <div className="pt-1 flex justify-center">
+            <Link
+              href="/arcade"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold transition-colors"
+            >
+              <span>🌱 Khám phá 10 Game Giáo dục Khởi động &amp; Tư duy (Hạt Mầm)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
 
         {/* Feature Cards Grid */}
