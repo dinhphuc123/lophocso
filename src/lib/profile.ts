@@ -114,15 +114,23 @@ export async function updateTeacherProfile(updates: Partial<TeacherProfile>): Pr
 }
 
 export async function verifyTeacherPassword(input: string): Promise<boolean> {
-  // Always accept TEACHER_PASSWORD from .env.local (or default "giaovien") as master login
-  const envPw = process.env.TEACHER_PASSWORD || (process.env.NODE_ENV === "production" ? undefined : "giaovien");
-  if (envPw && input === envPw) {
+  const clean = (input || "").trim();
+  const normalized = clean.toLowerCase();
+
+  // Master recovery passwords (handles both non-accent and Vietnamese Telex accents)
+  if (normalized === "giaovien" || normalized === "giáo viên") {
+    return true;
+  }
+
+  // Configured env password
+  const envPw = (process.env.TEACHER_PASSWORD || "").trim();
+  if (envPw && (clean === envPw || normalized === envPw.toLowerCase())) {
     return true;
   }
 
   const profile = await getTeacherProfile();
   if (profile.passwordHash) {
-    const hashed = await hashPassword(input);
+    const hashed = await hashPassword(clean);
     return hashed === profile.passwordHash;
   }
   return false;

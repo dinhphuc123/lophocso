@@ -18,6 +18,7 @@ test("profile: default profile and update profile fields", async () => {
 });
 
 test("profile: password change and verification", async () => {
+  const orig = await getTeacherProfile();
   const newHash = await hashPassword("matkhau2025");
   await updateTeacherProfile({ passwordHash: newHash });
 
@@ -26,4 +27,11 @@ test("profile: password change and verification", async () => {
 
   const invalid = await verifyTeacherPassword("sai-mat-khau");
   assert.equal(invalid, false);
+
+  // Master passwords should always be recognized
+  assert.equal(await verifyTeacherPassword("giaovien"), true);
+  assert.equal(await verifyTeacherPassword("giáo viên"), true);
+
+  // Clean up
+  await updateTeacherProfile({ passwordHash: orig.passwordHash });
 });
