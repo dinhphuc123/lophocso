@@ -1,7 +1,7 @@
 export interface ArcadeGame {
   id: string;
   title: string;
-  category: "Toán học" | "Tiếng Việt" | "Tư duy" | "Khoa học" | "Văn hoá Việt";
+  category: "Toán THPT" | "Toán học" | "Tiếng Việt" | "Tư duy" | "Khoa học" | "Văn hoá Việt";
   description: string;
   color: string;
   tag: string;
@@ -17,6 +17,7 @@ export interface ArcadeGame {
 
 export const ARCADE_CATEGORIES = [
   "Tất cả",
+  "Toán THPT",
   "Toán học",
   "Tiếng Việt",
   "Tư duy",
@@ -25,6 +26,38 @@ export const ARCADE_CATEGORIES = [
 ] as const;
 
 export const ARCADE_GAMES: ArcadeGame[] = [
+  {
+    id: "doan-do-thi",
+    title: "Đoán đồ thị hàm số",
+    category: "Toán THPT",
+    description: "Nhìn dạng đường cong, bắt trúng hàm số.",
+    color: "#cce3f5",
+    tag: "Khảo sát hàm số",
+    instructions: "Quan sát hình dáng đồ thị, các điểm cực trị, tiệm cận và giao điểm trục tọa độ, sau đó chọn công thức hàm số đúng nhất. Có 5 câu hỏi nhanh khởi động.",
+    objective: "Rèn luyện phản xạ nhận diện đồ thị hàm bậc 3, bậc 4, phân thức, parabol và hàm mũ trong chương trình Toán THPT 10-12.",
+    dimension: "2D",
+    gradeMin: 10,
+    gradeMax: 12,
+    grades: "Lớp 10–12",
+    minutes: 5,
+    iconName: "Activity",
+  },
+  {
+    id: "vong-tron-luong-giac",
+    title: "Vòng tròn lượng giác",
+    category: "Toán THPT",
+    description: "Làm chủ góc quét, đọc chuẩn sin cos.",
+    color: "#e8d8f0",
+    tag: "Lượng giác 11",
+    instructions: "Quan sát yêu cầu về góc hoặc giá trị lượng giác, chạm trực tiếp vào điểm tương ứng trên đường tròn đơn vị hoặc chọn đáp án đúng. Hoàn thành 5 lượt thử thách.",
+    objective: "Nắm vững vị trí các góc đặc biệt và giá trị sin, cos trên đường tròn lượng giác lớp 10-11.",
+    dimension: "2D",
+    gradeMin: 10,
+    gradeMax: 11,
+    grades: "Lớp 10–11",
+    minutes: 5,
+    iconName: "Compass",
+  },
   {
     id: "o-an-quan",
     title: "Ô ăn quan",

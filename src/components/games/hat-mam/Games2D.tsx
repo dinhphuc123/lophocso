@@ -990,7 +990,397 @@ function Cipher({ finish, tone }) {
     </>
   );
 }
+
+// ==========================================
+// TOÁN THPT: ĐOÁN ĐỒ THỊ HÀM SỐ (LỚP 10-12)
+// ==========================================
+function DoanDoThi({ finish, tone }) {
+  const questions = [
+    {
+      title: "Hàm số bậc ba có 2 điểm cực trị",
+      kind: "cubic",
+      choices: ["y = x³ - 3x", "y = -x³ + 3x", "y = x⁴ - 2x²", "y = x³ + 3x"],
+      correct: 0,
+      explain: "Nhánh phải đi lên (a > 0), đồ thị đi qua gốc O(0;0) và có 2 cực trị tại x = ±1.",
+    },
+    {
+      title: "Hàm phân thức bậc nhất / bậc nhất",
+      kind: "rational",
+      choices: ["y = (2x - 1)/(x + 1)", "y = (x - 2)/(x + 1)", "y = (2x + 1)/(x - 1)", "y = (-2x + 1)/(x + 1)"],
+      correct: 0,
+      explain: "Tiệm cận đứng x = -1, tiệm cận ngang y = 2, cắt trục tung tại y = -1.",
+    },
+    {
+      title: "Hàm trùng phương hình chữ M",
+      kind: "quartic",
+      choices: ["y = -x⁴ + 2x² + 1", "y = x⁴ - 2x² + 1", "y = -x⁴ - 2x² + 1", "y = -x² + 2x + 1"],
+      correct: 0,
+      explain: "Hai nhánh cắm xuống (a < 0), có 3 điểm cực trị (ab < 0), cắt trục tung tại (0; 1).",
+    },
+    {
+      title: "Hàm bậc hai Parabol (Lớp 10)",
+      kind: "parabola",
+      choices: ["y = x² - 4x + 3", "y = -x² + 4x - 3", "y = x² + 4x + 3", "y = 2x² - 4x + 1"],
+      correct: 0,
+      explain: "Bề lõm quay lên (a > 0), đỉnh I(2; -1), cắt trục hoành tại x = 1 và x = 3.",
+    },
+    {
+      title: "Hàm số mũ (Lớp 11-12)",
+      kind: "exponential",
+      choices: ["y = 2ˣ", "y = (1/2)ˣ", "y = log₂(x)", "y = x²"],
+      correct: 0,
+      explain: "Đồng biến trên R, luôn nằm phía trên trục hoành, tiệm cận ngang y = 0 và đi qua (0; 1).",
+    },
+  ];
+
+  const [round, setRound] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [score, setScore] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [msg, setMsg] = useState("Quan sát hình dạng đồ thị, tiệm cận và các điểm đặc biệt để chọn hàm số.");
+
+  const q = questions[round];
+
+  function choose(idx) {
+    if (answered) return;
+    setSelected(idx);
+    setAnswered(true);
+
+    if (idx === q.correct) {
+      tone(800, 0.18);
+      setScore((s) => s + 1);
+      setMsg("Chính xác! " + q.explain);
+    } else {
+      tone(320, 0.25);
+      setMsg("Chưa đúng. " + q.explain);
+    }
+  }
+
+  function next() {
+    if (round + 1 < questions.length) {
+      setRound((r) => r + 1);
+      setSelected(null);
+      setAnswered(false);
+      setMsg("Quan sát hình dạng đồ thị, tiệm cận và các điểm đặc biệt để chọn hàm số.");
+    } else {
+      finish({ score: score + (selected === q.correct ? 1 : 0), total: questions.length });
+    }
+  }
+
+  return (
+    <div className="g2-graph-box">
+      <div className="g2-scoreline">
+        <span className="g2-tag">CÂU {round + 1}/{questions.length}</span>
+        <span className="g2-tag" style={{ background: "#eff6ff", color: "#1d4ed8" }}>
+          ĐIỂM: {score}
+        </span>
+      </div>
+
+      <div className="g2-instructions">
+        <strong>{q.title}</strong> — Chọn đồ thị của hàm số nào?
+      </div>
+
+      <svg className="g2-graph-svg" viewBox="0 0 320 200" role="img" aria-label={q.title}>
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#f1f5f9" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <rect width="320" height="200" fill="url(#grid)" />
+
+        <line x1="20" y1="100" x2="300" y2="100" stroke="#64748b" strokeWidth="1.5" />
+        <polygon points="300,100 294,97 294,103" fill="#64748b" />
+        <text x="302" y="104" fontSize="11" fill="#475569" fontWeight="bold">x</text>
+
+        <line x1="160" y1="185" x2="160" y2="15" stroke="#64748b" strokeWidth="1.5" />
+        <polygon points="160,15 157,21 163,21" fill="#64748b" />
+        <text x="164" y="18" fontSize="11" fill="#475569" fontWeight="bold">y</text>
+        <text x="148" y="114" fontSize="11" fill="#94a3b8">O</text>
+
+        {q.kind === "cubic" && (
+          <>
+            <path
+              d="M 70 190 C 105 150 115 60 125 60 C 135 60 145 90 160 100 C 175 110 185 140 195 140 C 205 140 215 50 250 10"
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="2.5"
+            />
+            <circle cx="125" cy="60" r="4" fill="#ef4444" />
+            <text x="108" y="54" fontSize="10" fill="#ef4444" fontWeight="bold">(-1;2)</text>
+            <circle cx="195" cy="140" r="4" fill="#ef4444" />
+            <text x="198" y="152" fontSize="10" fill="#ef4444" fontWeight="bold">(1;-2)</text>
+          </>
+        )}
+
+        {q.kind === "rational" && (
+          <>
+            <line x1="120" y1="15" x2="120" y2="185" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 4" />
+            <text x="80" y="30" fontSize="10" fill="#64748b">TCĐ: x = -1</text>
+            <line x1="20" y1="65" x2="300" y2="65" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 4" />
+            <text x="230" y="58" fontSize="10" fill="#64748b">TCN: y = 2</text>
+            <path
+              d="M 30 75 Q 105 80 112 185"
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="2.5"
+            />
+            <path
+              d="M 128 15 Q 135 55 290 62"
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="2.5"
+            />
+            <circle cx="160" cy="120" r="3.5" fill="#10b981" />
+            <text x="165" y="123" fontSize="10" fill="#10b981" fontWeight="bold">y = -1</text>
+          </>
+        )}
+
+        {q.kind === "quartic" && (
+          <>
+            <path
+              d="M 90 190 Q 115 45 125 60 Q 140 85 160 80 Q 180 85 195 60 Q 205 45 230 190"
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="2.5"
+            />
+            <circle cx="125" cy="60" r="3.5" fill="#ef4444" />
+            <circle cx="195" cy="60" r="3.5" fill="#ef4444" />
+            <circle cx="160" cy="80" r="3.5" fill="#10b981" />
+            <text x="165" y="82" fontSize="10" fill="#10b981" fontWeight="bold">(0;1)</text>
+          </>
+        )}
+
+        {q.kind === "parabola" && (
+          <>
+            <path
+              d="M 130 20 Q 200 220 270 20"
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="2.5"
+            />
+            <circle cx="200" cy="120" r="4" fill="#ef4444" />
+            <text x="190" y="135" fontSize="10" fill="#ef4444" fontWeight="bold">I(2;-1)</text>
+            <circle cx="180" cy="100" r="3.5" fill="#10b981" />
+            <text x="175" y="94" fontSize="9" fill="#10b981">x=1</text>
+            <circle cx="220" cy="100" r="3.5" fill="#10b981" />
+            <text x="222" y="94" fontSize="9" fill="#10b981">x=3</text>
+          </>
+        )}
+
+        {q.kind === "exponential" && (
+          <>
+            <path
+              d="M 30 99 Q 140 98 160 85 Q 185 68 230 15"
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="2.5"
+            />
+            <circle cx="160" cy="85" r="3.5" fill="#ef4444" />
+            <text x="140" y="82" fontSize="10" fill="#ef4444" fontWeight="bold">(0;1)</text>
+            <circle cx="185" cy="68" r="3.5" fill="#10b981" />
+            <text x="190" y="68" fontSize="10" fill="#10b981" fontWeight="bold">(1;2)</text>
+          </>
+        )}
+      </svg>
+
+      <Notice>{msg}</Notice>
+
+      <div className="g2-math-grid">
+        {q.choices.map((c, i) => {
+          let stateClass = "";
+          if (answered) {
+            if (i === q.correct) stateClass = "correct";
+            else if (i === selected) stateClass = "wrong";
+          }
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={answered}
+              onClick={() => choose(i)}
+              className={"g2-math-btn " + stateClass}
+            >
+              <span>{String.fromCharCode(65 + i)}.</span>
+              <span>{c}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {answered && (
+        <div className="g2-actions" style={{ width: "100%", marginTop: "12px" }}>
+          <button type="button" className="g2-primary" onClick={next} style={{ width: "100%" }}>
+            {round + 1 < questions.length ? "Câu tiếp theo →" : "Xem kết quả tổng kết 🏆"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// TOÁN THPT: VÒNG TRÒN LƯỢNG GIÁC (LỚP 10-11)
+// ==========================================
+function VongTronLuongGiac({ finish, tone }) {
+  const questions = [
+    {
+      prompt: "Điểm biểu diễn góc α = π/3 (60°)",
+      activeAngle: Math.PI / 3,
+      choices: ["π/3 (60°)", "π/6 (30°)", "2π/3 (120°)", "π/4 (45°)"],
+      correct: 0,
+      explain: "Góc π/3 nằm ở góc phần tư I, có cos(π/3) = 1/2 và sin(π/3) = √3/2.",
+    },
+    {
+      prompt: "Góc nào có giá trị sin(α) = 1?",
+      activeAngle: Math.PI / 2,
+      choices: ["π/2 (90°)", "π (180°)", "0 rad", "3π/2 (270°)"],
+      correct: 0,
+      explain: "Điểm cao nhất trên trục tung sin là điểm cực bắc, tương ứng góc α = π/2.",
+    },
+    {
+      prompt: "Góc nào có cos(α) = -1/2 trong góc phần tư II?",
+      activeAngle: (2 * Math.PI) / 3,
+      choices: ["2π/3 (120°)", "3π/4 (135°)", "5π/6 (150°)", "π/3 (60°)"],
+      correct: 0,
+      explain: "cos(2π/3) = -1/2 và sin(2π/3) = √3/2 > 0.",
+    },
+    {
+      prompt: "Điểm biểu diễn của góc α = π (180°)",
+      activeAngle: Math.PI,
+      choices: ["π (180°)", "2π (360°)", "π/2 (90°)", "-π/2 (-90°)"],
+      correct: 0,
+      explain: "Góc π nằm ở điểm cực tây trên trục cos, có cos(π) = -1 và sin(π) = 0.",
+    },
+    {
+      prompt: "Góc nào có sin(α) = 0 và cos(α) = 1?",
+      activeAngle: 0,
+      choices: ["0 rad (gốc A)", "π rad", "π/2 rad", "3π/2 rad"],
+      correct: 0,
+      explain: "Gốc A(1; 0) trên trục hoành có tọa độ cos = 1, sin = 0 tương ứng với 0 rad.",
+    },
+  ];
+
+  const [round, setRound] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [score, setScore] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [msg, setMsg] = useState("Quan sát vòng tròn lượng giác đơn vị và chọn đáp án tương ứng.");
+
+  const q = questions[round];
+
+  function choose(idx) {
+    if (answered) return;
+    setSelected(idx);
+    setAnswered(true);
+
+    if (idx === q.correct) {
+      tone(820, 0.18);
+      setScore((s) => s + 1);
+      setMsg("Chính xác! " + q.explain);
+    } else {
+      tone(320, 0.25);
+      setMsg("Chưa đúng. " + q.explain);
+    }
+  }
+
+  function next() {
+    if (round + 1 < questions.length) {
+      setRound((r) => r + 1);
+      setSelected(null);
+      setAnswered(false);
+      setMsg("Quan sát vòng tròn lượng giác đơn vị và chọn đáp án tương ứng.");
+    } else {
+      finish({ score: score + (selected === q.correct ? 1 : 0), total: questions.length });
+    }
+  }
+
+  const cx = 140, cy = 140, r = 85;
+  const activeX = cx + r * Math.cos(q.activeAngle);
+  const activeY = cy - r * Math.sin(q.activeAngle);
+
+  return (
+    <div className="g2-graph-box">
+      <div className="g2-scoreline">
+        <span className="g2-tag">CÂU {round + 1}/{questions.length}</span>
+        <span className="g2-tag" style={{ background: "#f5f3ff", color: "#6d28d9" }}>
+          ĐIỂM: {score}
+        </span>
+      </div>
+
+      <div className="g2-instructions">
+        <strong>{q.prompt}</strong>
+      </div>
+
+      <svg className="g2-trig-svg" viewBox="0 0 280 280" role="img" aria-label="Vòng tròn lượng giác">
+        <circle cx={cx} cy={cy} r={r} fill="#fafbfc" stroke="#94a3b8" strokeWidth="2" />
+
+        <line x1="25" y1={cy} x2="255" y2={cy} stroke="#475569" strokeWidth="1.5" />
+        <polygon points="255,140 248,136 248,144" fill="#475569" />
+        <text x="240" y="132" fontSize="11" fill="#1e293b" fontWeight="bold">cos</text>
+
+        <line x1={cx} y1="255" x2={cx} y2="25" stroke="#475569" strokeWidth="1.5" />
+        <polygon points="140,25 136,32 144,32" fill="#475569" />
+        <text x="146" y="32" fontSize="11" fill="#1e293b" fontWeight="bold">sin</text>
+
+        <text x="128" y="154" fontSize="10" fill="#94a3b8">O</text>
+
+        {[0, Math.PI / 6, Math.PI / 4, Math.PI / 3, Math.PI / 2, (2 * Math.PI) / 3, (3 * Math.PI) / 4, (5 * Math.PI) / 6, Math.PI, (3 * Math.PI) / 2].map((ang, i) => {
+          const px = cx + r * Math.cos(ang);
+          const py = cy - r * Math.sin(ang);
+          return <circle key={i} cx={px} cy={py} r="2.5" fill="#cbd5e1" />;
+        })}
+
+        <line x1={cx} y1={cy} x2={activeX} y2={activeY} stroke="#8b5cf6" strokeWidth="2" strokeDasharray="3 3" />
+
+        <circle cx={activeX} cy={activeY} r="6" fill="#7c3aed" />
+        <circle cx={activeX} cy={activeY} r="10" fill="none" stroke="#a78bfa" strokeWidth="1.5" opacity="0.6" />
+
+        {answered && (
+          <>
+            <line x1={activeX} y1={activeY} x2={activeX} y2={cy} stroke="#10b981" strokeWidth="1.5" strokeDasharray="2 2" />
+            <line x1={activeX} y1={activeY} x2={cx} y2={activeY} stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="2 2" />
+          </>
+        )}
+      </svg>
+
+      <Notice>{msg}</Notice>
+
+      <div className="g2-math-grid">
+        {q.choices.map((c, i) => {
+          let stateClass = "";
+          if (answered) {
+            if (i === q.correct) stateClass = "correct";
+            else if (i === selected) stateClass = "wrong";
+          }
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={answered}
+              onClick={() => choose(i)}
+              className={"g2-math-btn " + stateClass}
+            >
+              <span>{String.fromCharCode(65 + i)}.</span>
+              <span>{c}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {answered && (
+        <div className="g2-actions" style={{ width: "100%", marginTop: "12px" }}>
+          <button type="button" className="g2-primary" onClick={next} style={{ width: "100%" }}>
+            {round + 1 < questions.length ? "Câu tiếp theo →" : "Xem kết quả tổng kết 🏆"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const COMPONENTS = {
+  "doan-do-thi": DoanDoThi,
+  "vong-tron-luong-giac": VongTronLuongGiac,
   "o-an-quan": OAnQuan,
   "ghep-chu": Words,
   "lat-the": Memory,

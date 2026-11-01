@@ -676,3 +676,78 @@
     transition: none !important;
   }
 }
+
+
+/* THPT Math Games */
+.g2-graph-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.g2-graph-svg {
+  width: 100%;
+  max-width: 380px;
+  height: 240px;
+  background: #ffffff;
+  border: 1.5px solid #d8dfeb;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+.g2-math-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+.g2-math-btn {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1.5px solid #d5ddef;
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.g2-math-btn:hover:not(:disabled) {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+}
+.g2-math-btn.selected {
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1e40af;
+}
+.g2-math-btn.correct {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #065f46;
+}
+.g2-math-btn.wrong {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+}
+.g2-trig-svg {
+  width: 100%;
+  max-width: 320px;
+  height: 320px;
+  background: #ffffff;
+  border: 1.5px solid #d8dfeb;
+  border-radius: 50%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  margin: 0 auto;
+}

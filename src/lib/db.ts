@@ -27,7 +27,13 @@ function writeDb(data: DatabaseSchema): void {
   if (fs.existsSync(DB_FILE)) fs.copyFileSync(DB_FILE, `${DB_FILE}.bak`);
   const tempFile = `${DB_FILE}.tmp`;
   fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), "utf-8");
-  fs.renameSync(tempFile, DB_FILE);
+  try {
+    fs.renameSync(tempFile, DB_FILE);
+  } catch {
+    // Windows file-lock retry/fallback when watched by Turbopack or antivirus
+    fs.copyFileSync(tempFile, DB_FILE);
+    try { fs.unlinkSync(tempFile); } catch {}
+  }
 }
 
 // All access is synchronous, so a read-modify-write can never interleave with another request in this process.
