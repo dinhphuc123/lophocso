@@ -19,6 +19,7 @@ import { parseExamText } from "@/lib/parser";
 import { Question } from "@/lib/types";
 import { MathText } from "@/components/MathText";
 import { SqlFixModal } from "@/components/SqlFixModal";
+import { distributeExamPoints, auditExamQuestions } from "@/lib/item-analysis";
 
 export default function CreateExamPage() {
   const router = useRouter();
@@ -406,12 +407,48 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
         {/* Parsed questions preview */}
         {parsedQuestions.length > 0 && (
           <div className="space-y-3 pt-4 border-t border-border">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 Kết quả nhận dạng: {parsedQuestions.length} câu hỏi
               </h3>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold text-muted-foreground">Chia điểm nhanh:</span>
+                <button
+                  type="button"
+                  onClick={() => setParsedQuestions((prev) => distributeExamPoints(prev, "bgd2025"))}
+                  className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-bold cursor-pointer"
+                >
+                  Chuẩn BGD 2025
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setParsedQuestions((prev) => distributeExamPoints(prev, "equal10"))}
+                  className="px-2.5 py-1 rounded-lg bg-muted hover:bg-muted/80 text-foreground border border-border text-[11px] font-bold cursor-pointer"
+                >
+                  Chia đều 10đ
+                </button>
+              </div>
             </div>
+
+            {(() => {
+              const issues = auditExamQuestions(parsedQuestions);
+              if (issues.length === 0) return null;
+              return (
+                <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 space-y-1 text-xs">
+                  <div className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Lưu ý rà soát đề sau khi nhập ({issues.length} cảnh báo):</span>
+                  </div>
+                  <ul className="list-disc list-inside text-[11px] text-amber-800 dark:text-amber-300 space-y-0.5">
+                    {issues.map((iss, i) => (
+                      <li key={i}>{iss.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
 
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
               {parsedQuestions.map((q, idx) => (

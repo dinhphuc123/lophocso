@@ -2,8 +2,10 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, Users, ChevronRight, AlertCircle, Download, Check, RotateCcw, Activity, Clock } from "lucide-react";
+import { ArrowLeft, Copy, Users, ChevronRight, AlertCircle, Download, Check, RotateCcw, Activity, Clock, BarChart3, Presentation } from "lucide-react";
 import { Exam, StudentSubmission, Attempt } from "@/lib/types";
+import { analyzeExamQuestions } from "@/lib/item-analysis";
+import { MathText } from "@/components/MathText";
 
 export default function ExamResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: examId } = use(params);
@@ -15,6 +17,7 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [selectedSub, setSelectedSub] = useState<StudentSubmission | null>(null);
+  const [activeTab, setActiveTab] = useState<"gradebook" | "analysis">("gradebook");
 
   // Manual grading state: { [qId]: { points: number, feedback: string } }
   const [manualGrades, setManualGrades] = useState<Record<string, { points: number; feedback: string }>>({});
@@ -116,6 +119,8 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
     submissions.length > 0
       ? (submissions.reduce((acc, s) => acc + s.score, 0) / submissions.length).toFixed(1)
       : "0";
+
+  const questionAnalysis = analyzeExamQuestions(exam, submissions);
 
   return (
     <div className="space-y-6">
@@ -322,7 +327,46 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
-      {/* Submissions Table */}
+      {/* Tab Switcher: Sổ điểm chi tiết vs Phân tích câu hỏi (Item Analysis) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center p-1 bg-muted rounded-xl border border-border">
+          <button
+            type="button"
+            onClick={() => setActiveTab("gradebook")}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === "gradebook"
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-blue-600" />
+            <span>Sổ điểm chi tiết ({submissions.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("analysis")}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === "analysis"
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Phân tích câu hỏi ({exam.questions.length} câu)</span>
+          </button>
+        </div>
+
+        <Link
+          href={`/teacher/exams/${examId}/presentation`}
+          className="px-3.5 py-2 rounded-xl border border-border bg-card hover:bg-muted text-xs font-semibold flex items-center gap-1.5 text-foreground"
+        >
+          <Presentation className="w-3.5 h-3.5 text-blue-600" />
+          <span>Trình chiếu chữa đề trên Tivi</span>
+        </Link>
+      </div>
+
+      {activeTab === "gradebook" ? (
+      /* Submissions Table */
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
         <div className="p-4 border-b border-border flex items-center justify-between">
           <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
@@ -408,6 +452,122 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
       </div>
+      ) : (
+      /* Item Analysis Table */
+      <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-emerald-600" />
+              <span>Phân tích tỷ lệ đúng từng câu hỏi (Item Analysis)</span>
+            </h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Phát hiện nhanh những câu học sinh hay nhầm để ưu tiên chữa trên lớp ({submissions.length} bài nộp)
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase text-[10px] font-semibold">
+              <tr>
+                <th className="p-3 pl-4 w-16">Câu</th>
+                <th className="p-3 min-w-[240px]">Nội dung câu hỏi</th>
+                <th className="p-3">Dạng / Mức độ</th>
+                <th className="p-3 w-44">Tỷ lệ làm đúng</th>
+                <th className="p-3">Điểm TB</th>
+                <th className="p-3">Phân bố chọn (A/B/C/D)</th>
+                <th className="p-3 pr-4 text-right">Độ khó thực tế</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {questionAnalysis.map((item) => {
+                const badgeColor =
+                  item.difficultyTag === "Dễ"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                    : item.difficultyTag === "Vừa sức"
+                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+                    : item.difficultyTag === "Khó"
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                    : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300";
+
+                const barColor =
+                  item.correctRate >= 80
+                    ? "bg-emerald-500"
+                    : item.correctRate >= 50
+                    ? "bg-blue-500"
+                    : item.correctRate >= 25
+                    ? "bg-amber-500"
+                    : "bg-rose-500";
+
+                return (
+                  <tr key={item.questionId} className="hover:bg-muted/30 transition-colors">
+                    <td className="p-3 pl-4 font-black text-foreground">Câu {item.index}</td>
+                    <td className="p-3 max-w-xs">
+                      <div className="line-clamp-2 text-foreground font-medium">
+                        <MathText content={item.text} />
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-muted-foreground">
+                          {item.type === "multiple_choice"
+                            ? "TN 4 chọn"
+                            : item.type === "true_false"
+                            ? "Đúng/Sai"
+                            : item.type === "short_answer"
+                            ? "Trả lời ngắn"
+                            : "Tự luận"}
+                        </span>
+                        {item.level && (
+                          <span className="px-1.5 py-0.5 rounded bg-muted text-foreground font-bold text-[10px]">
+                            {item.level}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                          <span className="text-foreground">
+                            {item.correctCount}/{item.attemptCount} em
+                          </span>
+                          <span className="font-mono">{item.correctRate}%</span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div className={`h-full ${barColor} rounded-full`} style={{ width: `${item.correctRate}%` }} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3 font-mono font-semibold text-foreground">
+                      {item.avgEarnedPoints} / {item.maxPoints}đ
+                    </td>
+                    <td className="p-3">
+                      {item.optionDistribution ? (
+                        <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                          {(["A", "B", "C", "D"] as const).map((k) => (
+                            <span key={k} className="px-1.5 py-0.5 rounded bg-muted border border-border">
+                              <strong>{k}:</strong> {item.optionDistribution![k]}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="p-3 pr-4 text-right">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${badgeColor}`}>
+                        {item.difficultyTag}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      )}
 
       {/* Student Detail Modal with Manual Essay Grading */}
       {selectedSub && (

@@ -22,6 +22,7 @@ import {
 import { Exam, Question, MultipleChoiceQuestion, TrueFalseQuestion, ShortAnswerQuestion } from "@/lib/types";
 import { MathText } from "@/components/MathText";
 import { SqlFixModal } from "@/components/SqlFixModal";
+import { distributeExamPoints, auditExamQuestions } from "@/lib/item-analysis";
 
 export default function ExamEditPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -133,6 +134,18 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
       next[index] = { ...next[index], level };
       return next;
     });
+  };
+
+  const updateQuestionPoints = (index: number, points: number) => {
+    setQuestions((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], points: Math.max(0, Number(points) || 0) };
+      return next;
+    });
+  };
+
+  const handleQuickDistributePoints = (mode: "bgd2025" | "equal10") => {
+    setQuestions((prev) => distributeExamPoints(prev, mode));
   };
 
   const updateMultipleChoiceOption = (qIndex: number, optId: "A" | "B" | "C" | "D", text: string) => {
@@ -406,7 +419,76 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
 
       {/* Danh sách câu hỏi */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        {/* Audit Checklist & Quick Point Distribution Bar (Chuẩn dethiso.vn) */}
+        {(() => {
+          const auditIssues = auditExamQuestions(questions);
+          const totalPts = Number(
+            questions
+              .reduce(
+                (acc, q) =>
+                  acc + (q.points ?? (q.type === "true_false" ? 1.0 : q.type === "short_answer" ? 0.5 : 0.25)),
+                0
+              )
+              .toFixed(2)
+          );
+          return (
+            <div className="p-4 rounded-2xl border border-border bg-card space-y-3 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-bold text-foreground">Tổng điểm đề thi:</span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full font-mono font-black text-xs ${
+                      Math.abs(totalPts - 10) < 0.01
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                    }`}
+                  >
+                    {totalPts} / 10 điểm
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-semibold text-muted-foreground">Chia điểm nhanh:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDistributePoints("bgd2025")}
+                    className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-bold cursor-pointer transition-colors"
+                  >
+                    Chuẩn BGD 2025 (TN 0.25đ · Đ/S 1đ · TLN 0.5đ)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDistributePoints("equal10")}
+                    className="px-2.5 py-1 rounded-lg bg-muted hover:bg-muted/80 text-foreground border border-border text-[11px] font-bold cursor-pointer transition-colors"
+                  >
+                    Chia đều 10 điểm
+                  </button>
+                </div>
+              </div>
+
+              {auditIssues.length > 0 ? (
+                <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 space-y-1.5 text-xs">
+                  <div className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Rà soát đề trước khi giao lớp: Phát hiện {auditIssues.length} điểm cần kiểm tra</span>
+                  </div>
+                  <ul className="list-disc list-inside text-[11px] text-amber-800 dark:text-amber-300 space-y-0.5">
+                    {auditIssues.map((iss, i) => (
+                      <li key={i}>{iss.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Đã rà soát cấu trúc: Tất cả câu hỏi đều có đầy đủ nội dung và khóa đáp án hợp lệ.</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold text-foreground">
               Danh sách câu hỏi ({questions.length} câu)
@@ -484,6 +566,20 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {/* Points input */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px] font-semibold text-muted-foreground">Điểm:</span>
+                      <input
+                        type="number"
+                        step="0.05"
+                        min="0"
+                        max="10"
+                        value={q.points ?? (isTF ? 1.0 : isSA ? 0.5 : 0.25)}
+                        onChange={(e) => updateQuestionPoints(idx, parseFloat(e.target.value))}
+                        className="w-16 px-2 py-1 rounded-lg border border-border bg-background text-xs font-bold font-mono text-center"
+                      />
+                    </div>
+
                     {/* Level selector */}
                     <div className="flex items-center gap-1">
                       <span className="text-[11px] font-semibold text-muted-foreground">Mức độ:</span>
