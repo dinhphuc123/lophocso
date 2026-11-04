@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAttempt, getExamWithFallback, saveSubmission } from "@/lib/db";
 import { gradeSubmission } from "@/lib/grader";
+import { shuffleExam } from "@/lib/shuffler";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { getSupabase } from "@/lib/supabase";
 
@@ -17,7 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ success: false, error: "Đề thi không tồn tại" }, { status: 404 });
     }
 
-    const { studentName, studentClass, answers } = await req.json();
+    const { studentName, studentClass, answers, code } = await req.json();
     const name = typeof studentName === "string" ? studentName.trim() : "";
     if (!name) {
       return NextResponse.json({ success: false, error: "Vui lòng nhập họ và tên học sinh" }, { status: 400 });
@@ -36,7 +37,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const clean = answers && typeof answers === "object" && !Array.isArray(answers) ? answers : {};
-    const submission = gradeSubmission(exam, attempt.studentName, attempt.studentClass || "Tự do", clean, attempt.startedAt);
+    const targetExam = typeof code === "string" && code ? shuffleExam(exam, code) : exam;
+    const submission = gradeSubmission(targetExam, attempt.studentName, attempt.studentClass || "Tự do", clean, attempt.startedAt);
     saveSubmission(submission);
 
     const supabase = getSupabase();

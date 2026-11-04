@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { LockKeyhole, Eye, EyeOff, KeyRound, ArrowLeft } from "lucide-react";
@@ -10,8 +10,18 @@ function LoginForm() {
   const next = searchParams.get("next");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [hasCustomPw, setHasCustomPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/login")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.hasCustomPassword) setHasCustomPw(true);
+      })
+      .catch(() => {});
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,22 +67,26 @@ function LoginForm() {
       {error && (
         <div role="alert" className="p-3 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 text-xs space-y-1">
           <div className="font-semibold">{error}</div>
-          <div className="text-[11px] opacity-90">
-            Gợi ý: Mật khẩu mặc định là <strong>giaovien</strong> (hỗ trợ cả gõ dấu <strong>giáo viên</strong>).
-          </div>
+          {!hasCustomPw && (
+            <div className="text-[11px] opacity-90">
+              Gợi ý: Mật khẩu mặc định là <strong>giaovien</strong> (hỗ trợ cả gõ dấu <strong>giáo viên</strong>).
+            </div>
+          )}
         </div>
       )}
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs font-semibold text-foreground">
           <label htmlFor="password-input">Mật khẩu</label>
-          <button
-            type="button"
-            onClick={handleFillDefault}
-            className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium cursor-pointer"
-          >
-            Điền &quot;giaovien&quot;
-          </button>
+          {!hasCustomPw && (
+            <button
+              type="button"
+              onClick={handleFillDefault}
+              className="text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium cursor-pointer"
+            >
+              Điền &quot;giaovien&quot;
+            </button>
+          )}
         </div>
 
         <div className="relative">
@@ -96,9 +110,11 @@ function LoginForm() {
             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Mật khẩu mặc định: <code className="px-1 py-0.5 rounded bg-muted font-bold text-foreground">giaovien</code>
-        </p>
+        {!hasCustomPw && (
+          <p className="text-[11px] text-muted-foreground">
+            Mật khẩu mặc định: <code className="px-1 py-0.5 rounded bg-muted font-bold text-foreground">giaovien</code>
+          </p>
+        )}
       </div>
 
       <button

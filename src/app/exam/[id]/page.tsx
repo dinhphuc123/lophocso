@@ -24,6 +24,7 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [startedAt, setStartedAt] = useState<string>("");
+  const [examCode, setExamCode] = useState<string>("101");
 
   // Submission & Result
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,16 +36,50 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
     if (classFromQuery) {
       setStudentClass(classFromQuery);
     }
-    const code = searchParams?.get("code");
-    const query = code ? `?code=${encodeURIComponent(code)}` : "";
-    fetch(`/api/exams/${examId}${query}`)
+
+    // Check localStorage for auto-saved draft in case student refreshed (F5) or lost network
+    let draft: {
+      studentName?: string;
+      studentClass?: string;
+      code?: string;
+      answers?: Record<string, unknown>;
+      startedAt?: string;
+      hasStarted?: boolean;
+    } | null = null;
+    try {
+      const raw = localStorage.getItem(`lhs_exam_draft_${examId}`);
+      if (raw) draft = JSON.parse(raw);
+    } catch {
+      // ignore storage errors
+    }
+
+    const codes = ["101", "102", "103", "104"];
+    const codeFromQuery = searchParams?.get("code");
+    const chosenCode = codeFromQuery || draft?.code || codes[Math.floor(Math.random() * codes.length)];
+    setExamCode(chosenCode);
+
+    fetch(`/api/exams/${examId}?code=${encodeURIComponent(chosenCode)}`)
       .then((res) => res.json())
       .then((data) => {
         if (!data.success) {
           setError(data.error || "Không tìm thấy đề thi");
         } else {
           setExam(data.exam);
-          setTimeLeft(data.exam.durationMinutes * 60);
+          const totalSecs = data.exam.durationMinutes * 60;
+          if (draft?.hasStarted && draft?.startedAt) {
+            const elapsed = Math.floor((Date.now() - new Date(draft.startedAt).getTime()) / 1000);
+            const remain = Math.max(0, totalSecs - elapsed);
+            if (remain > 0) {
+              if (draft.studentName) setStudentName(draft.studentName);
+              if (draft.studentClass) setStudentClass(draft.studentClass);
+              if (draft.answers) setAnswers(draft.answers);
+              setStartedAt(draft.startedAt);
+              setTimeLeft(remain);
+              setHasStarted(true);
+              return;
+            }
+          }
+          setTimeLeft(totalSecs);
           if (!classFromQuery && data.exam?.targetClass && data.exam.targetClass !== "Toàn trường") {
             setStudentClass(data.exam.targetClass);
           }
@@ -53,6 +88,26 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [examId]);
+
+  // Auto-save exam progress to localStorage whenever student selects an answer
+  useEffect(() => {
+    if (!hasStarted || result) return;
+    try {
+      localStorage.setItem(
+        `lhs_exam_draft_${examId}`,
+        JSON.stringify({
+          studentName,
+          studentClass,
+          code: exam?.code || examCode,
+          answers,
+          startedAt,
+          hasStarted: true,
+        })
+      );
+    } catch {
+      // ignore quota errors
+    }
+  }, [hasStarted, result, examId, studentName, studentClass, exam?.code, examCode, answers, startedAt]);
 
   // Countdown timer
   useEffect(() => {
@@ -147,10 +202,16 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
           studentClass,
           answers,
           startedAt,
+          code: exam.code || examCode,
         }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
+      try {
+        localStorage.removeItem(`lhs_exam_draft_${examId}`);
+      } catch {
+        // ignore
+      }
       setResult(data.submission);
       if (data.submission.score >= 8.0) {
         playSfx("victory");
@@ -446,8 +507,8 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
       {/* Main Content */}
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
         <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
-          <span>Tiến độ: <strong className="text-foreground">{answeredCount}/{exam.questions.length}</strong> câu</span>
-          <span>Bấm trực tiếp vào phương án để chọn đáp án</span>
+          <span>Tiến độ: <strong className="text-foreground">{answeredCount}/{exam.questions.length}</strong> câu • Mã đề: <strong className="text-foreground">{exam.code || examCode}</strong></span>
+          <span className="text-emerald-600 dark:text-emerald-400 font-medium">✓ Đã lưu nháp tự động (an toàn khi tải lại trang)</span>
         </div>
 
         {/* Questions list */}

@@ -991,48 +991,95 @@ function Cipher({ finish, tone }) {
   );
 }
 
+// Helper to shuffle choices while tracking the correct answer (assumed at index 0 in raw bank)
+function buildQuizSession(bank, count = 5) {
+  return mix(bank)
+    .slice(0, count)
+    .map((item) => {
+      const correctText = item.choices[0];
+      const shuffledChoices = mix(item.choices);
+      return {
+        ...item,
+        choices: shuffledChoices,
+        correct: shuffledChoices.indexOf(correctText),
+      };
+    });
+}
+
 // ==========================================
 // TOÁN THPT: ĐOÁN ĐỒ THỊ HÀM SỐ (LỚP 10-12)
 // ==========================================
-function DoanDoThi({ finish, tone }) {
-  const questions = [
-    {
-      title: "Hàm số bậc ba có 2 điểm cực trị",
-      kind: "cubic",
-      choices: ["y = x³ - 3x", "y = -x³ + 3x", "y = x⁴ - 2x²", "y = x³ + 3x"],
-      correct: 0,
-      explain: "Nhánh phải đi lên (a > 0), đồ thị đi qua gốc O(0;0) và có 2 cực trị tại x = ±1.",
-    },
-    {
-      title: "Hàm phân thức bậc nhất / bậc nhất",
-      kind: "rational",
-      choices: ["y = (2x - 1)/(x + 1)", "y = (x - 2)/(x + 1)", "y = (2x + 1)/(x - 1)", "y = (-2x + 1)/(x + 1)"],
-      correct: 0,
-      explain: "Tiệm cận đứng x = -1, tiệm cận ngang y = 2, cắt trục tung tại y = -1.",
-    },
-    {
-      title: "Hàm trùng phương hình chữ M",
-      kind: "quartic",
-      choices: ["y = -x⁴ + 2x² + 1", "y = x⁴ - 2x² + 1", "y = -x⁴ - 2x² + 1", "y = -x² + 2x + 1"],
-      correct: 0,
-      explain: "Hai nhánh cắm xuống (a < 0), có 3 điểm cực trị (ab < 0), cắt trục tung tại (0; 1).",
-    },
-    {
-      title: "Hàm bậc hai Parabol (Lớp 10)",
-      kind: "parabola",
-      choices: ["y = x² - 4x + 3", "y = -x² + 4x - 3", "y = x² + 4x + 3", "y = 2x² - 4x + 1"],
-      correct: 0,
-      explain: "Bề lõm quay lên (a > 0), đỉnh I(2; -1), cắt trục hoành tại x = 1 và x = 3.",
-    },
-    {
-      title: "Hàm số mũ (Lớp 11-12)",
-      kind: "exponential",
-      choices: ["y = 2ˣ", "y = (1/2)ˣ", "y = log₂(x)", "y = x²"],
-      correct: 0,
-      explain: "Đồng biến trên R, luôn nằm phía trên trục hoành, tiệm cận ngang y = 0 và đi qua (0; 1).",
-    },
-  ];
+const GRAPH_BANK = [
+  {
+    title: "Hàm bậc ba có 2 cực trị (a > 0)",
+    kind: "cubic_pos",
+    choices: ["y = x³ - 3x", "y = -x³ + 3x", "y = x⁴ - 2x²", "y = x³ + 3x"],
+    explain: "Nhánh phải đi lên (a > 0), đi qua gốc O(0;0) và có 2 cực trị tại x = ±1.",
+  },
+  {
+    title: "Hàm bậc ba có 2 cực trị (a < 0)",
+    kind: "cubic_neg",
+    choices: ["y = -x³ + 3x", "y = x³ - 3x", "y = -x⁴ + 2x²", "y = -x³ - 3x"],
+    explain: "Nhánh phải đi xuống (a < 0), cực tiểu tại (-1;-2) và cực đại tại (1;2).",
+  },
+  {
+    title: "Hàm bậc ba luôn đồng biến trên ℝ",
+    kind: "cubic_mono",
+    choices: ["y = x³ + x + 1", "y = -x³ - x + 1", "y = x³ - 3x + 1", "y = x² + x + 1"],
+    explain: "Nhánh phải đi lên (a > 0), không có cực trị (y' = 3x² + 1 > 0) và cắt Oy tại (0;1).",
+  },
+  {
+    title: "Hàm phân thức hữu tỉ (TCĐ x = -1, TCN y = 2)",
+    kind: "rational_1",
+    choices: ["y = (2x - 1)/(x + 1)", "y = (x - 2)/(x + 1)", "y = (2x + 1)/(x - 1)", "y = (-2x + 1)/(x + 1)"],
+    explain: "Tiệm cận đứng x = -1, tiệm cận ngang y = 2, cắt trục tung tại y = -1.",
+  },
+  {
+    title: "Hàm phân thức hữu tỉ (TCĐ x = 1, TCN y = 1)",
+    kind: "rational_2",
+    choices: ["y = (x + 1)/(x - 1)", "y = (x - 1)/(x + 1)", "y = (2x + 1)/(x - 1)", "y = (-x + 1)/(x - 1)"],
+    explain: "Tiệm cận đứng x = 1, tiệm cận ngang y = 1, hàm nghịch biến trên từng khoảng xác định.",
+  },
+  {
+    title: "Hàm trùng phương hình chữ M úp",
+    kind: "quartic_m",
+    choices: ["y = -x⁴ + 2x² + 1", "y = x⁴ - 2x² + 1", "y = -x⁴ - 2x² + 1", "y = -x² + 2x + 1"],
+    explain: "Hai nhánh cắm xuống (a < 0), có 3 điểm cực trị (a·b < 0), cắt Oy tại (0; 1).",
+  },
+  {
+    title: "Hàm trùng phương hình chữ W ngửa",
+    kind: "quartic_w",
+    choices: ["y = x⁴ - 2x² - 1", "y = -x⁴ + 2x² - 1", "y = x⁴ + 2x² - 1", "y = x² - 2x - 1"],
+    explain: "Hai nhánh hướng lên (a > 0), có 3 điểm cực trị (a·b < 0), cắt Oy tại (0; -1).",
+  },
+  {
+    title: "Hàm bậc hai Parabol bề lõm quay lên (Lớp 10)",
+    kind: "parabola_up",
+    choices: ["y = x² - 4x + 3", "y = -x² + 4x - 3", "y = x² + 4x + 3", "y = 2x² - 4x + 1"],
+    explain: "Bề lõm quay lên (a > 0), đỉnh I(2; -1), cắt trục hoành tại x = 1 và x = 3.",
+  },
+  {
+    title: "Hàm bậc hai Parabol bề lõm quay xuống (Lớp 10)",
+    kind: "parabola_down",
+    choices: ["y = -x² + 2x + 3", "y = x² - 2x - 3", "y = -x² - 2x + 3", "y = -2x² + 2x + 1"],
+    explain: "Bề lõm quay xuống (a < 0), đỉnh cực đại I(1; 4), cắt Oy tại (0; 3).",
+  },
+  {
+    title: "Hàm số mũ đồng biến (Lớp 11-12)",
+    kind: "exponential",
+    choices: ["y = 2ˣ", "y = (1/2)ˣ", "y = log₂(x)", "y = x²"],
+    explain: "Đồng biến trên ℝ (cơ số 2 > 1), nằm trên trục hoành (TCN y = 0) và đi qua (0; 1).",
+  },
+  {
+    title: "Hàm số Logarit đồng biến (Lớp 11-12)",
+    kind: "logarithm",
+    choices: ["y = log₂(x)", "y = log₀.₅(x)", "y = 2ˣ", "y = √x"],
+    explain: "Nằm bên phải trục tung (x > 0, TCĐ x = 0), đồng biến và đi qua (1; 0), (2; 1).",
+  },
+];
 
+function DoanDoThi({ finish, tone }) {
+  const [questions] = useState(() => buildQuizSession(GRAPH_BANK, 5));
   const [round, setRound] = useState(0);
   const [selected, setSelected] = useState(null);
   const [score, setScore] = useState(0);
@@ -1063,7 +1110,7 @@ function DoanDoThi({ finish, tone }) {
       setAnswered(false);
       setMsg("Quan sát hình dạng đồ thị, tiệm cận và các điểm đặc biệt để chọn hàm số.");
     } else {
-      finish({ score: score + (selected === q.correct ? 1 : 0), total: questions.length });
+      finish({ score, total: questions.length });
     }
   }
 
@@ -1077,7 +1124,7 @@ function DoanDoThi({ finish, tone }) {
       </div>
 
       <div className="g2-instructions">
-        <strong>{q.title}</strong> — Chọn đồ thị của hàm số nào?
+        <strong>{q.title}</strong> — Chọn công thức hàm số tương ứng:
       </div>
 
       <svg className="g2-graph-svg" viewBox="0 0 320 200" role="img" aria-label={q.title}>
@@ -1097,52 +1144,63 @@ function DoanDoThi({ finish, tone }) {
         <text x="164" y="18" fontSize="11" fill="#475569" fontWeight="bold">y</text>
         <text x="148" y="114" fontSize="11" fill="#94a3b8">O</text>
 
-        {q.kind === "cubic" && (
+        {q.kind === "cubic_pos" && (
           <>
-            <path
-              d="M 70 190 C 105 150 115 60 125 60 C 135 60 145 90 160 100 C 175 110 185 140 195 140 C 205 140 215 50 250 10"
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="2.5"
-            />
+            <path d="M 70 190 C 105 150 115 60 125 60 C 135 60 145 90 160 100 C 175 110 185 140 195 140 C 205 140 215 50 250 10" fill="none" stroke="#2563eb" strokeWidth="2.5" />
             <circle cx="125" cy="60" r="4" fill="#ef4444" />
-            <text x="108" y="54" fontSize="10" fill="#ef4444" fontWeight="bold">(-1;2)</text>
+            <text x="100" y="54" fontSize="10" fill="#ef4444" fontWeight="bold">(-1;2)</text>
             <circle cx="195" cy="140" r="4" fill="#ef4444" />
             <text x="198" y="152" fontSize="10" fill="#ef4444" fontWeight="bold">(1;-2)</text>
           </>
         )}
 
-        {q.kind === "rational" && (
+        {q.kind === "cubic_neg" && (
+          <>
+            <path d="M 70 10 C 105 50 115 140 125 140 C 135 140 145 110 160 100 C 175 90 185 60 195 60 C 205 60 215 150 250 190" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <circle cx="125" cy="140" r="4" fill="#ef4444" />
+            <text x="95" y="154" fontSize="10" fill="#ef4444" fontWeight="bold">(-1;-2)</text>
+            <circle cx="195" cy="60" r="4" fill="#ef4444" />
+            <text x="198" y="54" fontSize="10" fill="#ef4444" fontWeight="bold">(1;2)</text>
+          </>
+        )}
+
+        {q.kind === "cubic_mono" && (
+          <>
+            <path d="M 95 185 C 130 120 145 85 160 80 C 175 75 190 40 225 15" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <circle cx="160" cy="80" r="4" fill="#10b981" />
+            <text x="166" y="84" fontSize="10" fill="#10b981" fontWeight="bold">(0;1)</text>
+          </>
+        )}
+
+        {q.kind === "rational_1" && (
           <>
             <line x1="120" y1="15" x2="120" y2="185" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 4" />
-            <text x="80" y="30" fontSize="10" fill="#64748b">TCĐ: x = -1</text>
+            <text x="72" y="30" fontSize="10" fill="#64748b">TCĐ: x = -1</text>
             <line x1="20" y1="65" x2="300" y2="65" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 4" />
             <text x="230" y="58" fontSize="10" fill="#64748b">TCN: y = 2</text>
-            <path
-              d="M 30 75 Q 105 80 112 185"
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="2.5"
-            />
-            <path
-              d="M 128 15 Q 135 55 290 62"
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="2.5"
-            />
+            <path d="M 30 75 Q 105 80 112 185" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <path d="M 128 15 Q 135 55 290 62" fill="none" stroke="#2563eb" strokeWidth="2.5" />
             <circle cx="160" cy="120" r="3.5" fill="#10b981" />
             <text x="165" y="123" fontSize="10" fill="#10b981" fontWeight="bold">y = -1</text>
           </>
         )}
 
-        {q.kind === "quartic" && (
+        {q.kind === "rational_2" && (
           <>
-            <path
-              d="M 90 190 Q 115 45 125 60 Q 140 85 160 80 Q 180 85 195 60 Q 205 45 230 190"
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="2.5"
-            />
+            <line x1="190" y1="15" x2="190" y2="185" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 4" />
+            <text x="195" y="30" fontSize="10" fill="#64748b">TCĐ: x = 1</text>
+            <line x1="20" y1="80" x2="300" y2="80" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="4 4" />
+            <text x="35" y="74" fontSize="10" fill="#64748b">TCN: y = 1</text>
+            <path d="M 30 86 Q 175 92 183 185" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <path d="M 197 15 Q 205 70 290 76" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <circle cx="160" cy="120" r="3.5" fill="#10b981" />
+            <text x="122" y="124" fontSize="10" fill="#10b981" fontWeight="bold">(0;-1)</text>
+          </>
+        )}
+
+        {q.kind === "quartic_m" && (
+          <>
+            <path d="M 90 190 Q 115 45 125 60 Q 140 85 160 80 Q 180 85 195 60 Q 205 45 230 190" fill="none" stroke="#2563eb" strokeWidth="2.5" />
             <circle cx="125" cy="60" r="3.5" fill="#ef4444" />
             <circle cx="195" cy="60" r="3.5" fill="#ef4444" />
             <circle cx="160" cy="80" r="3.5" fill="#10b981" />
@@ -1150,14 +1208,19 @@ function DoanDoThi({ finish, tone }) {
           </>
         )}
 
-        {q.kind === "parabola" && (
+        {q.kind === "quartic_w" && (
           <>
-            <path
-              d="M 130 20 Q 200 220 270 20"
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="2.5"
-            />
+            <path d="M 90 15 Q 115 160 125 145 Q 140 115 160 120 Q 180 115 195 145 Q 205 160 230 15" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <circle cx="125" cy="145" r="3.5" fill="#ef4444" />
+            <circle cx="195" cy="145" r="3.5" fill="#ef4444" />
+            <circle cx="160" cy="120" r="3.5" fill="#10b981" />
+            <text x="165" y="118" fontSize="10" fill="#10b981" fontWeight="bold">(0;-1)</text>
+          </>
+        )}
+
+        {q.kind === "parabola_up" && (
+          <>
+            <path d="M 130 20 Q 200 220 270 20" fill="none" stroke="#2563eb" strokeWidth="2.5" />
             <circle cx="200" cy="120" r="4" fill="#ef4444" />
             <text x="190" y="135" fontSize="10" fill="#ef4444" fontWeight="bold">I(2;-1)</text>
             <circle cx="180" cy="100" r="3.5" fill="#10b981" />
@@ -1167,18 +1230,33 @@ function DoanDoThi({ finish, tone }) {
           </>
         )}
 
+        {q.kind === "parabola_down" && (
+          <>
+            <path d="M 110 185 Q 180 -65 250 185" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <circle cx="180" cy="40" r="4" fill="#ef4444" />
+            <text x="172" y="32" fontSize="10" fill="#ef4444" fontWeight="bold">I(1;4)</text>
+            <circle cx="160" cy="55" r="3.5" fill="#10b981" />
+            <text x="128" y="58" fontSize="10" fill="#10b981" fontWeight="bold">(0;3)</text>
+          </>
+        )}
+
         {q.kind === "exponential" && (
           <>
-            <path
-              d="M 30 99 Q 140 98 160 85 Q 185 68 230 15"
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="2.5"
-            />
+            <path d="M 30 99 Q 140 98 160 85 Q 185 68 230 15" fill="none" stroke="#2563eb" strokeWidth="2.5" />
             <circle cx="160" cy="85" r="3.5" fill="#ef4444" />
-            <text x="140" y="82" fontSize="10" fill="#ef4444" fontWeight="bold">(0;1)</text>
+            <text x="135" y="82" fontSize="10" fill="#ef4444" fontWeight="bold">(0;1)</text>
             <circle cx="185" cy="68" r="3.5" fill="#10b981" />
             <text x="190" y="68" fontSize="10" fill="#10b981" fontWeight="bold">(1;2)</text>
+          </>
+        )}
+
+        {q.kind === "logarithm" && (
+          <>
+            <path d="M 163 185 Q 166 115 185 100 Q 210 82 285 55" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <circle cx="185" cy="100" r="3.5" fill="#ef4444" />
+            <text x="178" y="115" fontSize="10" fill="#ef4444" fontWeight="bold">(1;0)</text>
+            <circle cx="210" cy="82" r="3.5" fill="#10b981" />
+            <text x="208" y="74" fontSize="10" fill="#10b981" fontWeight="bold">(2;1)</text>
           </>
         )}
       </svg>
@@ -1221,45 +1299,77 @@ function DoanDoThi({ finish, tone }) {
 // ==========================================
 // TOÁN THPT: VÒNG TRÒN LƯỢNG GIÁC (LỚP 10-11)
 // ==========================================
-function VongTronLuongGiac({ finish, tone }) {
-  const questions = [
-    {
-      prompt: "Điểm biểu diễn góc α = π/3 (60°)",
-      activeAngle: Math.PI / 3,
-      choices: ["π/3 (60°)", "π/6 (30°)", "2π/3 (120°)", "π/4 (45°)"],
-      correct: 0,
-      explain: "Góc π/3 nằm ở góc phần tư I, có cos(π/3) = 1/2 và sin(π/3) = √3/2.",
-    },
-    {
-      prompt: "Góc nào có giá trị sin(α) = 1?",
-      activeAngle: Math.PI / 2,
-      choices: ["π/2 (90°)", "π (180°)", "0 rad", "3π/2 (270°)"],
-      correct: 0,
-      explain: "Điểm cao nhất trên trục tung sin là điểm cực bắc, tương ứng góc α = π/2.",
-    },
-    {
-      prompt: "Góc nào có cos(α) = -1/2 trong góc phần tư II?",
-      activeAngle: (2 * Math.PI) / 3,
-      choices: ["2π/3 (120°)", "3π/4 (135°)", "5π/6 (150°)", "π/3 (60°)"],
-      correct: 0,
-      explain: "cos(2π/3) = -1/2 và sin(2π/3) = √3/2 > 0.",
-    },
-    {
-      prompt: "Điểm biểu diễn của góc α = π (180°)",
-      activeAngle: Math.PI,
-      choices: ["π (180°)", "2π (360°)", "π/2 (90°)", "-π/2 (-90°)"],
-      correct: 0,
-      explain: "Góc π nằm ở điểm cực tây trên trục cos, có cos(π) = -1 và sin(π) = 0.",
-    },
-    {
-      prompt: "Góc nào có sin(α) = 0 và cos(α) = 1?",
-      activeAngle: 0,
-      choices: ["0 rad (gốc A)", "π rad", "π/2 rad", "3π/2 rad"],
-      correct: 0,
-      explain: "Gốc A(1; 0) trên trục hoành có tọa độ cos = 1, sin = 0 tương ứng với 0 rad.",
-    },
-  ];
+const TRIG_BANK = [
+  {
+    prompt: "Điểm biểu diễn trên đường tròn của góc α = π/6 (30°)",
+    activeAngle: Math.PI / 6,
+    choices: ["π/6 (cos = √3/2, sin = 1/2)", "π/3 (cos = 1/2, sin = √3/2)", "π/4 (cos = √2/2, sin = √2/2)", "5π/6 (150°)"],
+    explain: "Góc π/6 (30°) ở góc phần tư I có hoành độ cos = √3/2 và tung độ sin = 1/2.",
+  },
+  {
+    prompt: "Điểm chính giữa cung phần tư thứ nhất (cos α = sin α > 0)",
+    activeAngle: Math.PI / 4,
+    choices: ["π/4 (45°)", "π/3 (60°)", "π/6 (30°)", "3π/4 (135°)"],
+    explain: "Tại góc α = π/4 (45°), hai giá trị lượng giác bằng nhau: sin(π/4) = cos(π/4) = √2/2.",
+  },
+  {
+    prompt: "Điểm biểu diễn góc α = π/3 (60°)",
+    activeAngle: Math.PI / 3,
+    choices: ["π/3 (60°)", "π/6 (30°)", "2π/3 (120°)", "π/4 (45°)"],
+    explain: "Góc π/3 nằm ở góc phần tư I, có cos(π/3) = 1/2 và sin(π/3) = √3/2.",
+  },
+  {
+    prompt: "Góc nào có giá trị sin(α) = 1 và cos(α) = 0?",
+    activeAngle: Math.PI / 2,
+    choices: ["π/2 (90°)", "π (180°)", "0 rad", "3π/2 (270°)"],
+    explain: "Điểm cao nhất B(0;1) trên trục tung sin tương ứng với góc α = π/2.",
+  },
+  {
+    prompt: "Góc nào có cos(α) = -1/2 trong góc phần tư II?",
+    activeAngle: (2 * Math.PI) / 3,
+    choices: ["2π/3 (120°)", "3π/4 (135°)", "5π/6 (150°)", "π/3 (60°)"],
+    explain: "Trong góc phần tư II (sin > 0, cos < 0), cos(2π/3) = -1/2 và sin(2π/3) = √3/2.",
+  },
+  {
+    prompt: "Góc nào ở góc phần tư II có tan(α) = -1?",
+    activeAngle: (3 * Math.PI) / 4,
+    choices: ["3π/4 (135°)", "2π/3 (120°)", "5π/6 (150°)", "-π/4 (-45°)"],
+    explain: "Tại α = 3π/4, sin = √2/2 và cos = -√2/2 nên tan(3π/4) = -1.",
+  },
+  {
+    prompt: "Góc nào ở góc phần tư II có sin(α) = 1/2 và cos(α) = -√3/2?",
+    activeAngle: (5 * Math.PI) / 6,
+    choices: ["5π/6 (150°)", "2π/3 (120°)", "7π/6 (210°)", "π/6 (30°)"],
+    explain: "Góc 5π/6 bù với π/6 nên có sin(5π/6) = 1/2 và cos(5π/6) = -√3/2.",
+  },
+  {
+    prompt: "Điểm biểu diễn của góc α = π (180°)",
+    activeAngle: Math.PI,
+    choices: ["π (cos = -1, sin = 0)", "2π (cos = 1, sin = 0)", "π/2 (90°)", "3π/2 (270°)"],
+    explain: "Góc π nằm ở điểm A'(-1; 0) trên trục cos, có cos(π) = -1 và sin(π) = 0.",
+  },
+  {
+    prompt: "Góc nào ở góc phần tư III có cả sin(α) = -1/2 và cos(α) = -√3/2?",
+    activeAngle: (7 * Math.PI) / 6,
+    choices: ["7π/6 (210°)", "5π/6 (150°)", "4π/3 (240°)", "11π/6 (330°)"],
+    explain: "Góc 7π/6 = π + π/6 nằm ở góc phần tư III nên cả sin và cos đều âm.",
+  },
+  {
+    prompt: "Điểm thấp nhất trên đường tròn lượng giác có sin(α) = -1",
+    activeAngle: (3 * Math.PI) / 2,
+    choices: ["3π/2 (270° hay -π/2)", "π (180°)", "π/2 (90°)", "0 rad"],
+    explain: "Điểm B'(0; -1) ở phía dưới trục sin biểu diễn góc 3π/2 (hoặc -π/2).",
+  },
+  {
+    prompt: "Điểm gốc A(1; 0) trên đường tròn lượng giác ứng với:",
+    activeAngle: 0,
+    choices: ["0 rad (cos = 1, sin = 0)", "π rad (cos = -1, sin = 0)", "π/2 rad", "3π/2 rad"],
+    explain: "Điểm gốc A(1; 0) trên tia Ox có cos(0) = 1 và sin(0) = 0.",
+  },
+];
 
+function VongTronLuongGiac({ finish, tone }) {
+  const [questions] = useState(() => buildQuizSession(TRIG_BANK, 5));
   const [round, setRound] = useState(0);
   const [selected, setSelected] = useState(null);
   const [score, setScore] = useState(0);
@@ -1290,7 +1400,7 @@ function VongTronLuongGiac({ finish, tone }) {
       setAnswered(false);
       setMsg("Quan sát vòng tròn lượng giác đơn vị và chọn đáp án tương ứng.");
     } else {
-      finish({ score: score + (selected === q.correct ? 1 : 0), total: questions.length });
+      finish({ score, total: questions.length });
     }
   }
 
@@ -1324,7 +1434,7 @@ function VongTronLuongGiac({ finish, tone }) {
 
         <text x="128" y="154" fontSize="10" fill="#94a3b8">O</text>
 
-        {[0, Math.PI / 6, Math.PI / 4, Math.PI / 3, Math.PI / 2, (2 * Math.PI) / 3, (3 * Math.PI) / 4, (5 * Math.PI) / 6, Math.PI, (3 * Math.PI) / 2].map((ang, i) => {
+        {[0, Math.PI / 6, Math.PI / 4, Math.PI / 3, Math.PI / 2, (2 * Math.PI) / 3, (3 * Math.PI) / 4, (5 * Math.PI) / 6, Math.PI, (7 * Math.PI) / 6, (3 * Math.PI) / 2].map((ang, i) => {
           const px = cx + r * Math.cos(ang);
           const py = cy - r * Math.sin(ang);
           return <circle key={i} cx={px} cy={py} r="2.5" fill="#cbd5e1" />;
@@ -1378,9 +1488,216 @@ function VongTronLuongGiac({ finish, tone }) {
   );
 }
 
+// ==========================================
+// TOÁN THPT: ĐẤU TRÍ VECTƠ & TỌA ĐỘ OXYZ (LỚP 10 & 12)
+// ==========================================
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateVectorQuestions() {
+  // 1. Tọa độ vectơ AB = (xB - xA; yB - yA; zB - zA)
+  const ax = randInt(-3, 4), ay = randInt(-3, 4), az = randInt(-2, 5);
+  const bx = ax + randInt(1, 5), by = ay - randInt(1, 4), bz = az + randInt(2, 5);
+  const dx = bx - ax, dy = by - ay, dz = bz - az;
+  const q1 = {
+    prompt: `Cho A(${ax}; ${ay}; ${az}) và B(${bx}; ${by}; ${bz}). Tọa độ của vectơ AB là:`,
+    vecLabel: `AB = (${dx}; ${dy}; ${dz})`,
+    choices: [
+      `(${dx}; ${dy}; ${dz})`,
+      `(${-dx}; ${-dy}; ${-dz})`,
+      `(${ax + bx}; ${ay + by}; ${az + bz})`,
+      `(${dx}; ${-dy}; ${dz})`,
+    ],
+    explain: `Ta lấy tọa độ điểm cuối trừ điểm đầu: AB = (${bx}-(${ax}); ${by}-(${ay}); ${bz}-(${az})) = (${dx}; ${dy}; ${dz}).`,
+  };
+
+  // 2. Trung điểm I của đoạn thẳng MN (tọa độ chẵn để chia 2 nguyên)
+  const mx = randInt(-2, 2) * 2, my = randInt(-2, 3) * 2, mz = randInt(0, 3) * 2;
+  const nx = mx + randInt(1, 3) * 2, ny = my - randInt(1, 2) * 2, nz = mz + randInt(1, 3) * 2;
+  const ix = (mx + nx) / 2, iy = (my + ny) / 2, iz = (mz + nz) / 2;
+  const q2 = {
+    prompt: `Tìm tọa độ trung điểm I của đoạn thẳng MN với M(${mx}; ${my}; ${mz}) và N(${nx}; ${ny}; ${nz}):`,
+    vecLabel: `I(${ix}; ${iy}; ${iz})`,
+    choices: [
+      `I(${ix}; ${iy}; ${iz})`,
+      `I(${mx + nx}; ${my + ny}; ${mz + nz})`,
+      `I(${nx - mx}; ${ny - my}; ${nz - mz})`,
+      `I(${ix + 1}; ${iy - 1}; ${iz})`,
+    ],
+    explain: `Trung điểm I có tọa độ bằng trung bình cộng: ((${mx}+${nx})/2; (${my}+${ny})/2; (${mz}+${nz})/2) = (${ix}; ${iy}; ${iz}).`,
+  };
+
+  // 3. Tích vô hướng u · v
+  const ux = randInt(1, 4), uy = randInt(-3, 3), uz = randInt(1, 3);
+  const vx = randInt(-2, 3), vy = randInt(1, 4), vz = randInt(-2, 3);
+  const dot = ux * vx + uy * vy + uz * vz;
+  const q3 = {
+    prompt: `Trong không gian Oxyz, tích vô hướng của u = (${ux}; ${uy}; ${uz}) và v = (${vx}; ${vy}; ${vz}) bằng:`,
+    vecLabel: `u · v = ${dot}`,
+    choices: [
+      `${dot}`,
+      `${dot + 3}`,
+      `${dot - 4}`,
+      `${ux + vx + uy + vy + uz + vz}`,
+    ],
+    explain: `Áp dụng công thức u · v = x₁x₂ + y₁y₂ + z₁z₂ = (${ux})·(${vx}) + (${uy})·(${vy}) + (${uz})·(${vz}) = ${dot}.`,
+  };
+
+  // 4. Độ dài vectơ |u| (bộ số nguyên Pytago 3D)
+  const triples = [
+    [1, 2, 2, 3],
+    [2, 3, 6, 7],
+    [1, 4, 8, 9],
+    [0, 3, 4, 5],
+    [2, 4, 4, 6],
+    [3, 4, 12, 13],
+  ];
+  const [tx, ty, tz, len] = triples[randInt(0, triples.length - 1)];
+  const q4 = {
+    prompt: `Độ dài |a| của vectơ a = (${tx}; -${ty}; ${tz}) bằng bao nhiêu?`,
+    vecLabel: `|a| = ${len}`,
+    choices: [
+      `${len}`,
+      `${len * len}`,
+      `${tx + ty + tz}`,
+      `${len + 2}`,
+    ],
+    explain: `|a| = √(${tx}² + (-${ty})² + ${tz}²) = √${len * len} = ${len}.`,
+  };
+
+  // 5. Trọng tâm G của tam giác ABC
+  const gx = randInt(-2, 3), gy = randInt(0, 4), gz = randInt(-1, 3);
+  const q5 = {
+    prompt: `Tam giác ABC có A(${gx - 1}; ${gy + 2}; ${gz}), B(${gx + 3}; ${gy - 1}; ${gz + 2}), C(${gx - 2}; ${gy - 1}; ${gz - 2}). Tọa độ trọng tâm G là:`,
+    vecLabel: `G(${gx}; ${gy}; ${gz})`,
+    choices: [
+      `G(${gx}; ${gy}; ${gz})`,
+      `G(${gx * 3}; ${gy * 3}; ${gz * 3})`,
+      `G(${gx + 1}; ${gy}; ${gz - 1})`,
+      `G(${gx}; ${gy + 1}; ${gz})`,
+    ],
+    explain: `Trọng tâm G = ((xA+xB+xC)/3; (yA+yB+yC)/3; (zA+zB+zC)/3) = (${gx}; ${gy}; ${gz}).`,
+  };
+
+  return buildQuizSession([q1, q2, q3, q4, q5], 5);
+}
+
+function VectoOxyz({ finish, tone }) {
+  const [questions] = useState(() => generateVectorQuestions());
+  const [round, setRound] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [score, setScore] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [msg, setMsg] = useState("Sử dụng công thức tọa độ vectơ không gian Oxyz để tìm đáp án đúng.");
+
+  const q = questions[round];
+
+  function choose(idx) {
+    if (answered) return;
+    setSelected(idx);
+    setAnswered(true);
+
+    if (idx === q.correct) {
+      tone(840, 0.18);
+      setScore((s) => s + 1);
+      setMsg("Chính xác! " + q.explain);
+    } else {
+      tone(320, 0.25);
+      setMsg("Chưa đúng. " + q.explain);
+    }
+  }
+
+  function next() {
+    if (round + 1 < questions.length) {
+      setRound((r) => r + 1);
+      setSelected(null);
+      setAnswered(false);
+      setMsg("Sử dụng công thức tọa độ vectơ không gian Oxyz để tìm đáp án đúng.");
+    } else {
+      finish({ score, total: questions.length });
+    }
+  }
+
+  return (
+    <div className="g2-graph-box">
+      <div className="g2-scoreline">
+        <span className="g2-tag">CÂU {round + 1}/{questions.length}</span>
+        <span className="g2-tag" style={{ background: "#ecfdf5", color: "#047857" }}>
+          ĐIỂM: {score}
+        </span>
+      </div>
+
+      <div className="g2-instructions">
+        <strong>{q.prompt}</strong>
+      </div>
+
+      <svg className="g2-graph-svg" viewBox="0 0 320 180" role="img" aria-label="Hệ trục tọa độ Oxyz">
+        <rect width="320" height="180" fill="#f8fafc" />
+        {/* Oz vertical */}
+        <line x1="140" y1="115" x2="140" y2="18" stroke="#475569" strokeWidth="1.8" />
+        <polygon points="140,15 136,23 144,23" fill="#475569" />
+        <text x="148" y="24" fontSize="12" fill="#0f172a" fontWeight="bold">z</text>
+        {/* Oy horizontal right */}
+        <line x1="140" y1="115" x2="285" y2="115" stroke="#475569" strokeWidth="1.8" />
+        <polygon points="288,115 280,111 280,119" fill="#475569" />
+        <text x="278" y="106" fontSize="12" fill="#0f172a" fontWeight="bold">y</text>
+        {/* Ox diagonal down-left */}
+        <line x1="140" y1="115" x2="55" y2="165" stroke="#475569" strokeWidth="1.8" />
+        <polygon points="52,167 61,166 57,159" fill="#475569" />
+        <text x="42" y="162" fontSize="12" fill="#0f172a" fontWeight="bold">x</text>
+        <text x="126" y="128" fontSize="11" fill="#64748b" fontWeight="bold">O</text>
+
+        {/* 3D Bounding Box projection */}
+        <line x1="140" y1="115" x2="225" y2="55" stroke="#059669" strokeWidth="2.8" />
+        <polygon points="228,53 219,55 224,62" fill="#059669" />
+        <line x1="225" y1="55" x2="225" y2="132" stroke="#94a3b8" strokeWidth="1.2" strokeDasharray="3 3" />
+        <line x1="140" y1="115" x2="225" y2="132" stroke="#94a3b8" strokeWidth="1.2" strokeDasharray="3 3" />
+        <circle cx="225" cy="55" r="4.5" fill="#10b981" />
+        <text x="180" y="45" fontSize="11" fill="#047857" fontWeight="bold">
+          {answered ? q.vecLabel : "M(x; y; z)"}
+        </text>
+      </svg>
+
+      <Notice>{msg}</Notice>
+
+      <div className="g2-math-grid">
+        {q.choices.map((c, i) => {
+          let stateClass = "";
+          if (answered) {
+            if (i === q.correct) stateClass = "correct";
+            else if (i === selected) stateClass = "wrong";
+          }
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={answered}
+              onClick={() => choose(i)}
+              className={"g2-math-btn " + stateClass}
+            >
+              <span>{String.fromCharCode(65 + i)}.</span>
+              <span>{c}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {answered && (
+        <div className="g2-actions" style={{ width: "100%", marginTop: "12px" }}>
+          <button type="button" className="g2-primary" onClick={next} style={{ width: "100%" }}>
+            {round + 1 < questions.length ? "Câu tiếp theo →" : "Xem kết quả tổng kết 🏆"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const COMPONENTS = {
   "doan-do-thi": DoanDoThi,
   "vong-tron-luong-giac": VongTronLuongGiac,
+  "vecto-oxyz": VectoOxyz,
   "o-an-quan": OAnQuan,
   "ghep-chu": Words,
   "lat-the": Memory,

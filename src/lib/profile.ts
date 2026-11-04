@@ -113,25 +113,35 @@ export async function updateTeacherProfile(updates: Partial<TeacherProfile>): Pr
   return cachedProfile;
 }
 
+export async function hasCustomPassword(): Promise<boolean> {
+  const profile = await getTeacherProfile();
+  return Boolean(profile.passwordHash);
+}
+
 export async function verifyTeacherPassword(input: string): Promise<boolean> {
   const clean = (input || "").trim();
+  if (!clean) return false;
   const normalized = clean.toLowerCase();
 
-  // Master recovery passwords (handles both non-accent and Vietnamese Telex accents)
+  const profile = await getTeacherProfile();
+
+  // If teacher has set a custom password in Settings, lock default "giaovien"
+  if (profile.passwordHash) {
+    const hashed = await hashPassword(clean);
+    if (hashed === profile.passwordHash) return true;
+    const envPw = (process.env.TEACHER_PASSWORD || "").trim();
+    return Boolean(envPw && envPw !== "giaovien" && clean === envPw);
+  }
+
+  // Initial state (no custom password set yet): accept default "giaovien" / "giáo viên" or env
   if (normalized === "giaovien" || normalized === "giáo viên") {
     return true;
   }
 
-  // Configured env password
   const envPw = (process.env.TEACHER_PASSWORD || "").trim();
   if (envPw && (clean === envPw || normalized === envPw.toLowerCase())) {
     return true;
   }
 
-  const profile = await getTeacherProfile();
-  if (profile.passwordHash) {
-    const hashed = await hashPassword(clean);
-    return hashed === profile.passwordHash;
-  }
   return false;
 }
