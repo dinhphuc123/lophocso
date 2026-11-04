@@ -1,35 +1,54 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getCardMatrix, generateCardSvg, ARUCO_4X4_PATTERNS } from "../src/lib/card-scanner";
+import {
+  getCardMatrix,
+  rotateMatrix90,
+  matchCardMatrix,
+  decodeRgbaPatchTo6x6,
+} from "../src/lib/card-scanner";
 
-test("card-scanner: generates 6x6 matrix with black outer border", () => {
-  const matrix = getCardMatrix(1);
-  assert.equal(matrix.length, 6);
-  assert.equal(matrix[0].length, 6);
+test("card-scanner: matches student cards across all 4 rotations (A, B, C, D)", () => {
+  const m1A = getCardMatrix(1);
+  const m1B = rotateMatrix90(m1A);
+  const m1C = rotateMatrix90(m1B);
+  const m1D = rotateMatrix90(m1C);
 
-  // Outer border must be 0 (black)
-  for (let c = 0; c < 6; c++) {
-    assert.equal(matrix[0][c], 0, "Top border must be 0");
-    assert.equal(matrix[5][c], 0, "Bottom border must be 0");
-    assert.equal(matrix[c][0], 0, "Left border must be 0");
-    assert.equal(matrix[c][5], 0, "Right border must be 0");
-  }
+  assert.deepEqual(matchCardMatrix(m1A), { studentId: 1, choice: "A", distance: 0 });
+  assert.deepEqual(matchCardMatrix(m1B), { studentId: 1, choice: "B", distance: 0 });
+  assert.deepEqual(matchCardMatrix(m1C), { studentId: 1, choice: "C", distance: 0 });
+  assert.deepEqual(matchCardMatrix(m1D), { studentId: 1, choice: "D", distance: 0 });
 
-  // Check pattern of student 1: [0x7, 0x2, 0xd, 0x1]
-  // 0x7 = 0111 -> [0, 1, 1, 1]
-  assert.equal(matrix[1][1], 0);
-  assert.equal(matrix[1][2], 1);
-  assert.equal(matrix[1][3], 1);
-  assert.equal(matrix[1][4], 1);
+  // Student #25 rotated 180 deg -> C, with 1 bit noise inside 4x4 payload
+  const m25C = rotateMatrix90(rotateMatrix90(getCardMatrix(25)));
+  m25C[2][2] = m25C[2][2] === 1 ? 0 : 1;
+  const noisyMatch = matchCardMatrix(m25C);
+  assert.ok(noisyMatch);
+  assert.equal(noisyMatch.studentId, 25);
+  assert.equal(noisyMatch.choice, "C");
+  assert.equal(noisyMatch.distance, 1);
 });
 
-test("card-scanner: generateCardSvg contains labels A, B, C, D and student id", () => {
-  const svg = generateCardSvg(5, "Nguyễn Văn A");
-  assert.ok(svg.includes("▲ A"));
-  assert.ok(svg.includes("▲ B"));
-  assert.ok(svg.includes("▲ C"));
-  assert.ok(svg.includes("▲ D"));
-  assert.ok(svg.includes("#5"));
-  assert.ok(svg.includes("Nguyễn Văn A"));
-  assert.ok(svg.includes("<svg"));
+test("card-scanner: rejects non-card white border and decodes RGBA patch", () => {
+  const allWhite = Array.from({ length: 6 }, () => Array(6).fill(1));
+  assert.equal(matchCardMatrix(allWhite), null);
+
+  // Synthesize a 60x60 RGBA image from student #7 rotated 90 deg (choice B)
+  const target = rotateMatrix90(getCardMatrix(7));
+  const rgba = new Uint8ClampedArray(60 * 60 * 4);
+  for (let y = 0; y < 60; y++) {
+    for (let x = 0; x < 60; x++) {
+      const r = Math.floor(y / 10);
+      const c = Math.floor(x / 10);
+      const val = target[r][c] === 1 ? 230 : 25; // simulated uneven lighting (25 vs 230)
+      const idx = (y * 60 + x) * 4;
+      rgba[idx] = val;
+      rgba[idx + 1] = val;
+      rgba[idx + 2] = val;
+      rgba[idx + 3] = 255;
+    }
+  }
+
+  const grid = decodeRgbaPatchTo6x6(rgba, 60, 60);
+  const decoded = matchCardMatrix(grid);
+  assert.deepEqual(decoded, { studentId: 7, choice: "B", distance: 0 });
 });

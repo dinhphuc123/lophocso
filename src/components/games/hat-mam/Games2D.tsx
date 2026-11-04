@@ -1694,10 +1694,223 @@ function VectoOxyz({ finish, tone }) {
   );
 }
 
+// ==========================================
+// TOÁN THPT: ĐẠO HÀM & NGUYÊN HÀM SIÊU TỐC (LỚP 11 & 12)
+// ==========================================
+function generateCalculusQuestions() {
+  // 1. Đạo hàm đa thức tại x0: f(x) = a*x^3 + b*x, tính f'(x0)
+  const a1 = randInt(1, 3), b1 = randInt(-4, 5), x0 = randInt(1, 3);
+  const fPrimeX0 = 3 * a1 * x0 * x0 + b1;
+  const b1Sign = b1 >= 0 ? `+ ${b1}x` : `- ${Math.abs(b1)}x`;
+  const q1 = {
+    prompt: `Cho hàm số f(x) = ${a1 === 1 ? "" : a1}x³ ${b1Sign}. Giá trị đạo hàm f'(${x0}) bằng:`,
+    badge: `f'(${x0}) = ${fPrimeX0}`,
+    mode: "tangent",
+    choices: [
+      `${fPrimeX0}`,
+      `${a1 * x0 * x0 * x0 + b1 * x0}`,
+      `${3 * a1 * x0 + b1}`,
+      `${fPrimeX0 + 3}`,
+    ],
+    explain: `Ta có f'(x) = ${3 * a1}x² ${b1 >= 0 ? `+ ${b1}` : `- ${Math.abs(b1)}`}. Thay x = ${x0} được f'(${x0}) = ${3 * a1}·${x0}² + (${b1}) = ${fPrimeX0}.`,
+  };
+
+  // 2. Hệ số góc tiếp tuyến của Parabol y = x² + k*x tại hoành độ x1
+  const k2 = randInt(-3, 4), x1 = randInt(-2, 4);
+  const slope = 2 * x1 + k2;
+  const k2Str = k2 === 0 ? "" : k2 > 0 ? `+ ${k2}x` : `- ${Math.abs(k2)}x`;
+  const q2 = {
+    prompt: `Hệ số góc k của tiếp tuyến đồ thị hàm số y = x² ${k2Str} + 1 tại điểm có hoành độ x₀ = ${x1} là:`,
+    badge: `k = y'(${x1}) = ${slope}`,
+    mode: "tangent",
+    choices: [
+      `k = ${slope}`,
+      `k = ${x1 * x1 + k2 * x1 + 1}`,
+      `k = ${2 * x1 - k2}`,
+      `k = ${slope + 2}`,
+    ],
+    explain: `Hệ số góc tiếp tuyến tại x₀ = ${x1} là k = y'(${x1}) = 2·(${x1}) + (${k2}) = ${slope}.`,
+  };
+
+  // 3. Công thức đạo hàm lượng giác / hàm mũ
+  const trigBank = [
+    {
+      prompt: "Đạo hàm của hàm số y = sin(2x) trên ℝ là:",
+      badge: "y' = 2cos(2x)",
+      mode: "tangent",
+      choices: ["y' = 2cos(2x)", "y' = cos(2x)", "y' = -2cos(2x)", "y' = 2sin(2x)"],
+      explain: "Áp dụng (sin u)' = u'·cos u với u = 2x, ta có (sin 2x)' = 2cos(2x).",
+    },
+    {
+      prompt: "Đạo hàm của hàm số y = cos(3x) trên ℝ là:",
+      badge: "y' = -3sin(3x)",
+      mode: "tangent",
+      choices: ["y' = -3sin(3x)", "y' = 3sin(3x)", "y' = -sin(3x)", "y' = -3cos(3x)"],
+      explain: "Áp dụng (cos u)' = -u'·sin u với u = 3x, ta có (cos 3x)' = -3sin(3x).",
+    },
+    {
+      prompt: "Đạo hàm của hàm số mũ y = e²ˣ là:",
+      badge: "y' = 2e²ˣ",
+      mode: "tangent",
+      choices: ["y' = 2e²ˣ", "y' = e²ˣ", "y' = 2x·e²ˣ⁻¹", "y' = e²ˣ / 2"],
+      explain: "Áp dụng (eᵘ)' = u'·eᵘ với u = 2x, ta được y' = 2e²ˣ.",
+    },
+  ];
+  const q3 = trigBank[randInt(0, trigBank.length - 1)];
+
+  // 4. Nguyên hàm đa thức: ∫ (n*x^(n-1) + c) dx
+  const n4 = randInt(2, 4), c4 = randInt(1, 6);
+  const q4 = {
+    prompt: `Họ tất cả các nguyên hàm của hàm số f(x) = ${n4}x${n4 === 2 ? "²"[0] ? "^" + (n4 - 1) : "" : ""} + ${c4} là:`.replace("^1", ""),
+    badge: `F(x) = x^${n4} + ${c4}x + C`,
+    mode: "integral",
+    choices: [
+      `x^${n4} + ${c4}x + C`,
+      `${n4}x^${n4} + ${c4}x + C`,
+      `x^${n4} + ${c4} + C`,
+      `${n4 * (n4 - 1)}x + C`,
+    ],
+    explain: `Vì (x^${n4} + ${c4}x)' = ${n4}x${n4 - 1 === 1 ? "" : "^" + (n4 - 1)} + ${c4} nên ∫f(x)dx = x^${n4} + ${c4}x + C.`,
+  };
+
+  // 5. Tích phân xác định: ∫ từ 0 đến b của (2x + m) dx = b² + m*b
+  const b5 = randInt(1, 4), m5 = randInt(1, 5);
+  const val5 = b5 * b5 + m5 * b5;
+  const q5 = {
+    prompt: `Tính tích phân xác định I = ∫₀^${b5} (2x + ${m5}) dx:`,
+    badge: `I = ${val5}`,
+    mode: "integral",
+    choices: [
+      `${val5}`,
+      `${2 * b5 + m5}`,
+      `${val5 + b5}`,
+      `${b5 * b5 + m5}`,
+    ],
+    explain: `Nguyên hàm của (2x + ${m5}) là F(x) = x² + ${m5}x. Thế cận từ 0 đến ${b5}: I = ${b5}² + ${m5}·${b5} - 0 = ${val5}.`,
+  };
+
+  return buildQuizSession([q1, q2, q3, q4, q5], 5);
+}
+
+function DaoHamNguyenHam({ finish, tone }) {
+  const [questions] = useState(() => generateCalculusQuestions());
+  const [round, setRound] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [score, setScore] = useState(0);
+  const [answered, setAnswered] = useState(false);
+  const [msg, setMsg] = useState("Áp dụng công thức đạo hàm tiếp tuyến (Lớp 11) hoặc nguyên hàm tích phân (Lớp 12).");
+
+  const q = questions[round];
+
+  function choose(idx) {
+    if (answered) return;
+    setSelected(idx);
+    setAnswered(true);
+
+    if (idx === q.correct) {
+      tone(860, 0.18);
+      setScore((s) => s + 1);
+      setMsg("Chính xác! " + q.explain);
+    } else {
+      tone(320, 0.25);
+      setMsg("Chưa đúng. " + q.explain);
+    }
+  }
+
+  function next() {
+    if (round + 1 < questions.length) {
+      setRound((r) => r + 1);
+      setSelected(null);
+      setAnswered(false);
+      setMsg("Áp dụng công thức đạo hàm tiếp tuyến (Lớp 11) hoặc nguyên hàm tích phân (Lớp 12).");
+    } else {
+      finish({ score, total: questions.length });
+    }
+  }
+
+  return (
+    <div className="g2-graph-box">
+      <div className="g2-scoreline">
+        <span className="g2-tag">CÂU {round + 1}/{questions.length}</span>
+        <span className="g2-tag" style={{ background: "#fef3c7", color: "#b45309" }}>
+          ĐIỂM: {score}
+        </span>
+      </div>
+
+      <div className="g2-instructions">
+        <strong>{q.prompt}</strong>
+      </div>
+
+      <svg className="g2-graph-svg" viewBox="0 0 320 175" role="img" aria-label="Minh họa Giải tích">
+        <rect width="320" height="175" fill="#fffbeb" />
+        <line x1="25" y1="135" x2="295" y2="135" stroke="#64748b" strokeWidth="1.5" />
+        <line x1="65" y1="160" x2="65" y2="18" stroke="#64748b" strokeWidth="1.5" />
+        <text x="52" y="148" fontSize="10" fill="#64748b">O</text>
+
+        {q.mode === "integral" ? (
+          <>
+            <path d="M 100 135 L 100 85 Q 160 40 220 65 L 220 135 Z" fill="#fde68a" opacity="0.7" />
+            <path d="M 75 110 Q 155 25 255 75" fill="none" stroke="#d97706" strokeWidth="2.5" />
+            <line x1="100" y1="85" x2="100" y2="135" stroke="#b45309" strokeDasharray="3 3" />
+            <line x1="220" y1="65" x2="220" y2="135" stroke="#b45309" strokeDasharray="3 3" />
+            <text x="96" y="148" fontSize="10" fill="#b45309" fontWeight="bold">a</text>
+            <text x="216" y="148" fontSize="10" fill="#b45309" fontWeight="bold">b</text>
+            <text x="135" y="108" fontSize="12" fill="#92400e" fontWeight="bold">
+              {answered ? q.badge : "S = ∫ f(x)dx"}
+            </text>
+          </>
+        ) : (
+          <>
+            <path d="M 70 145 Q 150 20 245 120" fill="none" stroke="#2563eb" strokeWidth="2.5" />
+            <line x1="95" y1="120" x2="235" y2="42" stroke="#dc2626" strokeWidth="2" strokeDasharray="4 3" />
+            <circle cx="160" cy="84" r="4.5" fill="#dc2626" />
+            <text x="168" y="92" fontSize="11" fill="#b91c1c" fontWeight="bold">
+              {answered ? q.badge : "Tiếp tuyến k = f'(x₀)"}
+            </text>
+          </>
+        )}
+      </svg>
+
+      <Notice>{msg}</Notice>
+
+      <div className="g2-math-grid">
+        {q.choices.map((c, i) => {
+          let stateClass = "";
+          if (answered) {
+            if (i === q.correct) stateClass = "correct";
+            else if (i === selected) stateClass = "wrong";
+          }
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={answered}
+              onClick={() => choose(i)}
+              className={"g2-math-btn " + stateClass}
+            >
+              <span>{String.fromCharCode(65 + i)}.</span>
+              <span>{c}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {answered && (
+        <div className="g2-actions" style={{ width: "100%", marginTop: "12px" }}>
+          <button type="button" className="g2-primary" onClick={next} style={{ width: "100%" }}>
+            {round + 1 < questions.length ? "Câu tiếp theo →" : "Xem kết quả tổng kết 🏆"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const COMPONENTS = {
   "doan-do-thi": DoanDoThi,
   "vong-tron-luong-giac": VongTronLuongGiac,
   "vecto-oxyz": VectoOxyz,
+  "dao-ham-nguyen-ham": DaoHamNguyenHam,
   "o-an-quan": OAnQuan,
   "ghep-chu": Words,
   "lat-the": Memory,

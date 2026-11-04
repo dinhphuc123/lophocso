@@ -15,6 +15,7 @@ import {
   Sparkles
 } from "lucide-react";
 import { RoomView } from "@/lib/game-store";
+import { decodeRgbaPatchTo6x6, matchCardMatrix } from "@/lib/card-scanner";
 
 export default function MobileScannerPage({ params }: { params: Promise<{ pin: string }> }) {
   const { pin } = use(params);
@@ -79,6 +80,41 @@ export default function MobileScannerPage({ params }: { params: Promise<{ pin: s
   useEffect(() => {
     return () => stopCamera();
   }, []);
+
+  // Real-time optical scanner loop on live video frame (samples central ROI every 500ms)
+  useEffect(() => {
+    if (!cameraActive) return;
+    const timer = setInterval(() => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState < 2) return;
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (!vw || !vh) return;
+
+      const patchSize = Math.min(vw, vh) * 0.5;
+      const sx = Math.floor((vw - patchSize) / 2);
+      const sy = Math.floor((vh - patchSize) / 2);
+      canvas.width = 120;
+      canvas.height = 120;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.drawImage(video, sx, sy, patchSize, patchSize, 0, 0, 120, 120);
+      const imgData = ctx.getImageData(0, 0, 120, 120);
+      const grid6x6 = decodeRgbaPatchTo6x6(imgData.data, 120, 120);
+      const decoded = matchCardMatrix(grid6x6);
+      if (decoded) {
+        setScannedStudents((prev) => ({
+          ...prev,
+          [decoded.studentId]: decoded.choice,
+        }));
+        setStatusMessage(`🎯 Đã quét thẻ #HS ${decoded.studentId} → Chọn ${decoded.choice}`);
+      }
+    }, 500);
+
+    return () => clearInterval(timer);
+  }, [cameraActive]);
 
   // Simulated / Mock fast Card Detection for classroom demonstration
   // In addition, teachers can tap quick-tag or use Camera Optical Flow

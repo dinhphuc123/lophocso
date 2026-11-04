@@ -2,14 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ARCADE_GAMES, ARCADE_CATEGORIES } from "../src/lib/arcade-catalog";
 
-test("arcade: catalog includes all 13 educational games including 3 THPT math games", () => {
-  assert.equal(ARCADE_GAMES.length, 13);
+test("arcade: catalog includes all 14 educational games including 4 THPT math games", () => {
+  assert.equal(ARCADE_GAMES.length, 14);
   assert.ok(ARCADE_CATEGORIES.includes("Toán THPT"));
 
   const expectedIds = [
     "doan-do-thi",
     "vong-tron-luong-giac",
     "vecto-oxyz",
+    "dao-ham-nguyen-ham",
     "o-an-quan",
     "ghep-chu",
     "lat-the",
@@ -34,8 +35,9 @@ test("arcade: catalog includes all 13 educational games including 3 THPT math ga
 
   // Verify THPT specific games
   const thptGames = ARCADE_GAMES.filter((g) => g.category === "Toán THPT");
-  assert.equal(thptGames.length, 3);
+  assert.equal(thptGames.length, 4);
   assert.ok(thptGames.some((g) => g.id === "doan-do-thi" && g.gradeMin >= 10));
   assert.ok(thptGames.some((g) => g.id === "vong-tron-luong-giac" && g.gradeMin >= 10));
   assert.ok(thptGames.some((g) => g.id === "vecto-oxyz" && g.gradeMin >= 10));
+  assert.ok(thptGames.some((g) => g.id === "dao-ham-nguyen-ham" && g.gradeMin >= 11));
 });

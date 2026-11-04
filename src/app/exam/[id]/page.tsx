@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
-import { Clock, CheckCircle2, AlertCircle, ArrowRight, User, Award, Check, X, RotateCcw } from "lucide-react";
+import { Clock, CheckCircle2, AlertCircle, ArrowRight, User, Award, Check, X, RotateCcw, Wifi, WifiOff, ShieldAlert } from "lucide-react";
 import { Exam, StudentSubmission } from "@/lib/types";
 import { MathText } from "@/components/MathText";
 import { playSfx, launchConfetti } from "@/lib/effects";
@@ -29,6 +29,33 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
   // Submission & Result
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<StudentSubmission | null>(null);
+
+  // Network & Focus Anti-Cheat Tracking
+  const [isOnline, setIsOnline] = useState(true);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+
+  useEffect(() => {
+    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasStarted || result) return;
+    const onVisChange = () => {
+      if (document.hidden) {
+        setTabSwitchCount((c) => c + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisChange);
+    return () => document.removeEventListener("visibilitychange", onVisChange);
+  }, [hasStarted, result]);
 
   useEffect(() => {
     const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
@@ -488,7 +515,19 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span
+            title={isOnline ? "Kết nối mạng ổn định" : "Mất kết nối mạng — bài làm vẫn tự động lưu vào máy"}
+            className={`hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border ${
+              isOnline
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-900"
+                : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-900 animate-pulse"
+            }`}
+          >
+            {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+            <span>{isOnline ? "Trực tuyến" : "Ngoại tuyến"}</span>
+          </span>
+
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-mono text-sm font-bold border border-blue-200 dark:border-blue-900">
             <Clock className="w-4 h-4" />
             <span>{formatTime(timeLeft)}</span>
@@ -505,16 +544,66 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
       </header>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
-        <div className="flex items-center justify-between text-xs text-muted-foreground pb-2 border-b border-border">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-5">
+        {!isOnline && (
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs font-semibold flex items-center gap-2">
+            <WifiOff className="w-4 h-4 shrink-0" />
+            <span>Mất kết nối Internet! Em cứ tiếp tục làm bài bình thường — mọi đáp án đều được lưu nháp an toàn trên thiết bị và có thể nộp ngay khi có mạng lại.</span>
+          </div>
+        )}
+
+        {tabSwitchCount > 0 && (
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-200 text-xs font-semibold flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>Cảnh báo giám sát phòng thi: Hệ thống ghi nhận em đã rời khỏi màn hình bài thi <strong>{tabSwitchCount} lần</strong>.</span>
+            </span>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground pb-2 border-b border-border">
           <span>Tiến độ: <strong className="text-foreground">{answeredCount}/{exam.questions.length}</strong> câu • Mã đề: <strong className="text-foreground">{exam.code || examCode}</strong></span>
           <span className="text-emerald-600 dark:text-emerald-400 font-medium">✓ Đã lưu nháp tự động (an toàn khi tải lại trang)</span>
+        </div>
+
+        {/* Quick Question Palette (1..N) */}
+        <div className="p-3.5 rounded-2xl bg-card border border-border shadow-2xs space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+            <span>Bảng câu hỏi nhanh (chạm để chuyển tới câu):</span>
+            <span className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-600 inline-block" /> Đã làm</span>
+              <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-muted border border-border inline-block" /> Chưa làm</span>
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {exam.questions.map((q, idx) => {
+              const val = answers[q.id];
+              const isDone =
+                val !== undefined &&
+                val !== "" &&
+                (typeof val !== "object" || Object.keys(val as Record<string, unknown>).length > 0);
+              return (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => document.getElementById(`q-${q.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center border ${
+                    isDone
+                      ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                      : "bg-muted/60 hover:bg-muted text-foreground border-border"
+                  }`}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Questions list */}
         <div className="space-y-6">
           {exam.questions.map((q, idx) => (
-            <div key={q.id} className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-2xs space-y-4">
+            <div id={`q-${q.id}`} key={q.id} className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-2xs space-y-4 scroll-mt-20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-sm sm:text-base text-foreground">

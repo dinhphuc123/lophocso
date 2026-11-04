@@ -135,3 +135,117 @@ export function generateCardSvg(studentId: number, studentName = `Học sinh ${s
     </svg>
   `.trim();
 }
+
+export interface DecodedCardResult {
+  studentId: number;
+  choice: "A" | "B" | "C" | "D";
+  distance: number;
+}
+
+const ROTATION_CHOICES: ("A" | "B" | "C" | "D")[] = ["A", "B", "C", "D"];
+
+/**
+ * Rotates a square N x N matrix 90 degrees clockwise.
+ */
+export function rotateMatrix90(mat: number[][]): number[][] {
+  const n = mat.length;
+  return Array.from({ length: n }, (_, r) =>
+    Array.from({ length: n }, (_, c) => mat[n - 1 - c][r])
+  );
+}
+
+/**
+ * Matches an observed 6x6 binary grid (0 = black, 1 = white) against the 40 student card patterns
+ * across all 4 rotations (0=A, 90°=B, 180°=C, 270°=D).
+ * Rejects grids whose outer 1-cell border has > 3 white noise cells.
+ * shortcut: allows Hamming distance <= 2 on the inner 4x4 payload, upgrade to full homography contour warp if scanning > 5m away.
+ */
+export function matchCardMatrix(
+  grid6x6: number[][],
+  maxHammingDistance = 2
+): DecodedCardResult | null {
+  if (grid6x6.length !== 6 || grid6x6.some((row) => row.length !== 6)) return null;
+
+  // Verify outer black border (20 cells on the perimeter of 6x6)
+  let borderErrors = 0;
+  for (let i = 0; i < 6; i++) {
+    if (grid6x6[0][i] !== 0) borderErrors++;
+    if (grid6x6[5][i] !== 0) borderErrors++;
+    if (i > 0 && i < 5) {
+      if (grid6x6[i][0] !== 0) borderErrors++;
+      if (grid6x6[i][5] !== 0) borderErrors++;
+    }
+  }
+  if (borderErrors > 3) return null;
+
+  let best: DecodedCardResult | null = null;
+
+  for (let id = 1; id <= ARUCO_4X4_PATTERNS.length; id++) {
+    let candidate = getCardMatrix(id);
+    for (let rot = 0; rot < 4; rot++) {
+      let dist = 0;
+      for (let r = 1; r <= 4; r++) {
+        for (let c = 1; c <= 4; c++) {
+          if (grid6x6[r][c] !== candidate[r][c]) dist++;
+        }
+      }
+      if (dist <= maxHammingDistance && (!best || dist < best.distance)) {
+        best = {
+          studentId: id,
+          choice: ROTATION_CHOICES[rot],
+          distance: dist,
+        };
+        if (dist === 0) return best;
+      }
+      candidate = rotateMatrix90(candidate);
+    }
+  }
+
+  return best;
+}
+
+/**
+ * Samples a 6x6 binary matrix from an RGBA image patch using local mean adaptive thresholding.
+ * Helps handle uneven classroom lighting (projector glare / window shadows).
+ */
+export function decodeRgbaPatchTo6x6(
+  rgba: Uint8ClampedArray | number[],
+  width: number,
+  height: number
+): number[][] {
+  // Compute grayscale + global average luminance of the patch
+  const gray = new Float32Array(width * height);
+  let sumAll = 0;
+  for (let i = 0; i < width * height; i++) {
+    const idx = i * 4;
+    const lum = 0.299 * rgba[idx] + 0.587 * rgba[idx + 1] + 0.114 * rgba[idx + 2];
+    gray[i] = lum;
+    sumAll += lum;
+  }
+  const threshold = sumAll / (width * height);
+
+  const grid: number[][] = Array.from({ length: 6 }, () => Array(6).fill(0));
+  const cellW = width / 6;
+  const cellH = height / 6;
+
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 6; c++) {
+      // Sample inner 50% of each cell to avoid edge bleed
+      const x0 = Math.floor((c + 0.25) * cellW);
+      const x1 = Math.max(x0 + 1, Math.floor((c + 0.75) * cellW));
+      const y0 = Math.floor((r + 0.25) * cellH);
+      const y1 = Math.max(y0 + 1, Math.floor((r + 0.75) * cellH));
+      let cellSum = 0;
+      let count = 0;
+      for (let y = y0; y < y1 && y < height; y++) {
+        for (let x = x0; x < x1 && x < width; x++) {
+          cellSum += gray[y * width + x];
+          count++;
+        }
+      }
+      const cellMean = count > 0 ? cellSum / count : 0;
+      grid[r][c] = cellMean > threshold ? 1 : 0;
+    }
+  }
+  return grid;
+}
