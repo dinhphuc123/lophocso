@@ -21,6 +21,8 @@ import {
   X
 } from "lucide-react";
 import { RoomView, PlayerView } from "@/lib/game-store";
+import { getCyberGateStageMeta, CYBER_GATES_PACKS } from "@/lib/cyber-gates-presets";
+import { CyberScenarioSvg, CyberShieldTray, speakVietnameseText, stopVietnameseSpeech } from "@/components/games/CyberGatesView";
 import { MathText } from "@/components/MathText";
 import { playSfx, launchConfetti, setSoundMuted, playLobbyBgm, playCountdownBgm, stopBgm } from "@/lib/effects";
 import { getAvatarInfo } from "@/lib/avatars";
@@ -32,6 +34,8 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [clueOpen, setClueOpen] = useState(false);
+  const [isSpeakingTts, setIsSpeakingTts] = useState(false);
 
   // Bonus points & export modal states
   const [showBonusModal, setShowBonusModal] = useState(false);
@@ -86,8 +90,15 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
   }, [room]);
 
   useEffect(() => {
+    setClueOpen(false);
+    stopVietnameseSpeech();
+    setIsSpeakingTts(false);
+  }, [room?.currentQuestionIndex, room?.state]);
+
+  useEffect(() => {
     return () => {
       stopBgm();
+      stopVietnameseSpeech();
     };
   }, []);
 
@@ -275,6 +286,8 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
                 ? "🏎️"
                 : room.mode === "golden_bell"
                 ? "🔔"
+                : room.mode === "cyber_gates"
+                ? "🛡️"
                 : "💃"}
             </span>
             <div>
@@ -289,6 +302,8 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
                   ? "Đường Đua Tri Thức F1"
                   : room.mode === "golden_bell"
                   ? "Rung Chuông Vàng"
+                  : room.mode === "cyber_gates"
+                  ? "Mật Vụ Toán Học: Giải Mã 5 Cánh Cổng Bí Ẩn"
                   : "Vũ Điệu Tri Thức"}
               </h1>
               <p className="text-xs text-slate-400 line-clamp-1">{room.examTitle}</p>
@@ -352,6 +367,46 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
               {room.pin}
             </div>
           </div>
+
+          {room.mode === "cyber_gates" && (
+            <div className="max-w-3xl mx-auto p-4 rounded-2xl bg-cyan-950/60 border border-cyan-400/50 text-left space-y-3 shadow-lg">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                  <span>📡 Tín hiệu từ Chỉ huy Đội Đặc Nhiệm Toán Học:</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSpeakingTts) {
+                      stopVietnameseSpeech();
+                      setIsSpeakingTts(false);
+                    } else {
+                      setIsSpeakingTts(true);
+                      speakVietnameseText(
+                        `Chào mừng các Thám Tử Toán Học đến với chiến dịch ${room.examTitle}. Các em hãy nhập mã PIN ${room.pin.split("").join(" ")} để cùng vượt qua 5 Cánh Cổng Bí Ẩn, mở Kính Lúp Manh Mối và thu thập đủ 5 Mảnh Khiên Hộ Vệ nhé!`,
+                        () => setIsSpeakingTts(false)
+                      );
+                    }
+                  }}
+                  className="px-3 py-1 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400 text-[11px] font-bold text-cyan-100 cursor-pointer"
+                >
+                  {isSpeakingTts ? "⏹️ Đang đọc... (Dừng)" : "🔊 Nghe lời dẫn nhiệm vụ"}
+                </button>
+              </div>
+              <div className="grid grid-cols-5 gap-2 text-center">
+                {Array.from({ length: Math.min(5, room.totalQuestions) }).map((_, idx) => {
+                  const meta = getCyberGateStageMeta(room.examId, idx);
+                  return (
+                    <div key={idx} className="p-2 rounded-xl bg-slate-900/90 border border-cyan-500/30 text-[11px]">
+                      <div className="text-lg">{meta.icon}</div>
+                      <div className="font-extrabold text-cyan-300 truncate">Cổng #{idx + 1}</div>
+                      <div className="text-[10px] text-slate-400 truncate">{meta.gateTitle.split(": ")[1] || meta.gateTitle}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Joined Players */}
           <div className="max-w-3xl mx-auto pt-4">
@@ -517,6 +572,27 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
             </div>
           )}
 
+          {/* Mode Cyber Gates: Mật Vụ Giải Mã 5 Cánh Cổng */}
+          {room.mode === "cyber_gates" && (
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2.5">
+                <span className="text-3xl animate-pulse">🛡️</span>
+                <div>
+                  <div className="text-xs font-extrabold text-cyan-400 uppercase tracking-widest">
+                    Đội Đặc Nhiệm Toán Học · Giải Mã 5 Cánh Cổng
+                  </div>
+                  <div className="text-sm font-black text-amber-300">
+                    {getCyberGateStageMeta(room.examId, room.currentQuestionIndex).gateTitle}
+                  </div>
+                </div>
+              </div>
+              <CyberShieldTray
+                unlockedCount={room.currentQuestionIndex + (isReveal ? 1 : 0)}
+                totalGates={Math.min(5, room.totalQuestions)}
+              />
+            </div>
+          )}
+
           {/* Question Counter & Submissions */}
           <div className="flex items-center gap-3 shrink-0">
             <button
@@ -549,32 +625,122 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
 
         {/* Question Board */}
         {currentQ ? (
-          <div className="my-auto max-w-4xl mx-auto w-full space-y-6 text-center py-4">
-            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
-              <div className="text-xs uppercase tracking-widest text-amber-400 font-bold">
-                {currentQ.level && `[${currentQ.level}] · `}
-                {currentQ.type === "multiple_choice"
-                  ? "Chọn 1 đáp án đúng"
-                  : currentQ.type === "true_false"
-                  ? "Đúng / Sai"
-                  : "Trả lời ngắn"}
-              </div>
+          <div className="my-auto max-w-5xl mx-auto w-full space-y-5 text-center py-2">
+            {/* Cyber Gates 2-column Scenario + Clue Panel */}
+            {room.mode === "cyber_gates" && (() => {
+              const stageMeta = getCyberGateStageMeta(room.examId, room.currentQuestionIndex);
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 text-left">
+                  <div className="lg:col-span-5 p-4 rounded-2xl bg-slate-900/95 border border-cyan-500/40 space-y-3 shadow-lg">
+                    <div className="flex items-center justify-between text-xs font-extrabold text-cyan-300 uppercase tracking-wider">
+                      <span>🖥️ Mô phỏng {stageMeta.gateTitle}</span>
+                      <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-amber-300">{stageMeta.icon} Cổng #{stageMeta.stageNumber}</span>
+                    </div>
+                    <CyberScenarioSvg svgType={stageMeta.svgType} />
+                    <div className="p-2.5 rounded-xl bg-indigo-950/70 border border-amber-400/40 text-xs text-amber-100 italic">
+                      💭 <strong>Gợi ý tư duy:</strong> {stageMeta.thinkingPrompt}
+                    </div>
+                  </div>
 
-              <div className="text-lg sm:text-2xl font-bold leading-relaxed text-slate-100">
-                <MathText content={currentQ.text} />
-              </div>
+                  <div className="lg:col-span-7 flex flex-col justify-between p-4 rounded-2xl bg-slate-900/95 border border-cyan-500/40 space-y-3 shadow-lg">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">
+                          📋 TÌNH HUỐNG &amp; CÂU HỎI NHIỆM VỤ:
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isSpeakingTts) {
+                                stopVietnameseSpeech();
+                                setIsSpeakingTts(false);
+                              } else {
+                                setIsSpeakingTts(true);
+                                speakVietnameseText(
+                                  isReveal && room.explanation
+                                    ? `${stageMeta.mentorPraise}. Giải thích: ${room.explanation}`
+                                    : `${stageMeta.gateTitle}. ${currentQ.text}. Gợi ý: ${stageMeta.thinkingPrompt}`,
+                                  () => setIsSpeakingTts(false)
+                                );
+                              }
+                            }}
+                            className="px-3 py-1 rounded-full bg-cyan-500/20 hover:bg-cyan-500/35 border border-cyan-400 text-[11px] font-bold text-cyan-100 cursor-pointer"
+                          >
+                            {isSpeakingTts ? "⏹️ Đang đọc..." : isReveal ? "🔊 Nghe Giải Mã" : "🔊 Nghe Đề Bài"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playSfx("countdown");
+                              setClueOpen((v) => !v);
+                            }}
+                            className="px-3 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400 text-[11px] font-bold text-amber-200 cursor-pointer"
+                          >
+                            🔍 {clueOpen ? "Ẩn Kính Lúp Manh Mối" : "Mở Kính Lúp Manh Mối"}
+                          </button>
+                        </div>
+                      </div>
 
-              {currentQ.imageUrl && (
-                <div className="flex justify-center pt-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={currentQ.imageUrl}
-                    alt="Hình minh họa"
-                    className="max-h-60 rounded-xl bg-white p-2 border border-slate-700 shadow-md object-contain"
-                  />
+                      <div className="text-base sm:text-xl font-bold leading-relaxed text-white pt-1">
+                        <MathText content={currentQ.text} />
+                      </div>
+                    </div>
+
+                    {clueOpen && (
+                      <div className="p-3 rounded-xl bg-amber-950/75 border-2 border-amber-400 text-xs sm:text-sm text-amber-100 space-y-1 animate-in fade-in duration-200">
+                        <div className="font-extrabold text-amber-300 uppercase text-xs">
+                          🔍 KÍNH LÚP MANH MỐI PHÂN TÍCH:
+                        </div>
+                        <div>{stageMeta.clueText}</div>
+                      </div>
+                    )}
+
+                    {isReveal && (
+                      <div className="p-3 rounded-xl bg-emerald-950/80 border-2 border-emerald-400 flex items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="text-[11px] font-extrabold text-emerald-300 uppercase">
+                            🔑 ĐÃ MỞ KHÓA CHÌA KHÓA VÀNG #{stageMeta.stageNumber} &amp; MẢNH KHIÊN {stageMeta.stageNumber}/5
+                          </div>
+                          <div className="text-xs sm:text-sm font-black text-amber-300">
+                            🔐 {stageMeta.ruleCode}
+                          </div>
+                        </div>
+                        <div className="text-3xl shrink-0">🔑🛡️</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+              );
+            })()}
+
+            {room.mode !== "cyber_gates" && (
+              <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
+                <div className="text-xs uppercase tracking-widest text-amber-400 font-bold">
+                  {currentQ.level && `[${currentQ.level}] · `}
+                  {currentQ.type === "multiple_choice"
+                    ? "Chọn 1 đáp án đúng"
+                    : currentQ.type === "true_false"
+                    ? "Đúng / Sai"
+                    : "Trả lời ngắn"}
+                </div>
+
+                <div className="text-lg sm:text-2xl font-bold leading-relaxed text-slate-100">
+                  <MathText content={currentQ.text} />
+                </div>
+
+                {currentQ.imageUrl && (
+                  <div className="flex justify-center pt-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={currentQ.imageUrl}
+                      alt="Hình minh họa"
+                      className="max-h-60 rounded-xl bg-white p-2 border border-slate-700 shadow-md object-contain"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Multiple Choice Options */}
             {currentQ.type === "multiple_choice" && (
@@ -715,6 +881,27 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
             {room.winner === "class" ? "🏆 CẢ LỚP ĐÃ ĐÁNH BẠI ĐƯỢC BOSS RỒNG!" : "💀 BOSS RỒNG ĐÃ CHIẾN THẮNG!"}
           </p>
         )}
+        {room.mode === "cyber_gates" && (
+          <div className="max-w-3xl mx-auto mt-3 p-4 rounded-2xl bg-cyan-950/75 border-2 border-amber-400/70 text-left space-y-2 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-extrabold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <span>🛡️ CỔNG KHÁM PHÁ LỚN: LÁ CHẮN TOÁN HỌC ĐÃ KHÔI PHỤC (5/5 MẢNH KHIÊN)</span>
+              </div>
+              <span className="text-xs font-black text-emerald-300">🔑 5/5 Chìa Khóa Vàng</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-1">
+              {Array.from({ length: Math.min(5, room.totalQuestions) }).map((_, idx) => {
+                const meta = getCyberGateStageMeta(room.examId, idx);
+                return (
+                  <div key={idx} className="p-2 rounded-xl bg-slate-900/90 border border-cyan-500/40 text-[10px]">
+                    <div className="font-extrabold text-amber-300">{meta.icon} Cổng #{idx + 1}</div>
+                    <div className="text-slate-200 mt-0.5 leading-snug">{meta.ruleCode}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Podium */}
@@ -780,6 +967,11 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
                   {room.mode === "farm" && (
                     <span className="text-emerald-400 text-[10px]">
                       🌾 {p.crops}
+                    </span>
+                  )}
+                  {room.mode === "cyber_gates" && (
+                    <span className="text-amber-300 text-[10px] font-bold">
+                      🔑 {p.crops}/5 Khiên
                     </span>
                   )}
                 </div>

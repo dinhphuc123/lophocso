@@ -19,15 +19,20 @@ import {
   Clock,
   BookOpen,
   Presentation,
+  Shield,
 } from "lucide-react";
 import { Exam } from "@/lib/types";
+import { GameMode } from "@/lib/game-store";
+import { CYBER_GATES_PACKS } from "@/lib/cyber-gates-presets";
 import { ARCADE_GAMES, ARCADE_CATEGORIES } from "@/lib/arcade-catalog";
+
+const VALID_MODES: GameMode[] = ["arena", "bomb", "farm", "race", "golden_bell", "dance", "cyber_gates"];
 
 function GamesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedExamId = searchParams.get("examId");
-  const modeParam = searchParams.get("mode") as "arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance" | null;
+  const modeParam = searchParams.get("mode") as GameMode | null;
   const tabParam = searchParams.get("tab") as "multiplayer" | "arcade" | null;
 
   const [activeTab, setActiveTab] = useState<"multiplayer" | "arcade">(
@@ -36,15 +41,18 @@ function GamesContent() {
   const [selectedArcadeCat, setSelectedArcadeCat] = useState<string>("Tất cả");
 
   const [exams, setExams] = useState<Exam[]>([]);
-  const [selectedExamId, setSelectedExamId] = useState<string>(preselectedExamId || "");
-  const [selectedMode, setSelectedMode] = useState<"arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance">(
-    modeParam && ["arena", "bomb", "farm", "race", "golden_bell", "dance"].includes(modeParam) ? modeParam : "race"
+  const [selectedExamId, setSelectedExamId] = useState<string>(preselectedExamId || CYBER_GATES_PACKS[0].exam.id);
+  const [selectedMode, setSelectedMode] = useState<GameMode>(
+    modeParam && VALID_MODES.includes(modeParam) ? modeParam : "cyber_gates"
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSelectMode = (mode: "arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance") => {
+  const handleSelectMode = (mode: GameMode) => {
     setSelectedMode(mode);
+    if (mode === "cyber_gates" && !selectedExamId.startsWith("preset-cyber-gates-")) {
+      setSelectedExamId(CYBER_GATES_PACKS[0].exam.id);
+    }
     router.replace(`/teacher/games?mode=${mode}&tab=multiplayer`, { scroll: false });
   };
 
@@ -54,7 +62,7 @@ function GamesContent() {
   };
 
   useEffect(() => {
-    if (modeParam && ["arena", "bomb", "farm", "race", "golden_bell", "dance"].includes(modeParam)) {
+    if (modeParam && VALID_MODES.includes(modeParam)) {
       setSelectedMode(modeParam);
     }
     if (tabParam === "arcade") {
@@ -179,6 +187,42 @@ function GamesContent() {
           <div className="space-y-3">
             <label className="text-sm font-bold text-foreground">1. Chọn chế độ trò chơi:</label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Mode 7 (Featured): Cyber Gates - Mật vụ Toán học: Giải mã 5 Cánh Cổng */}
+              <div
+                onClick={() => handleSelectMode("cyber_gates")}
+                className={`sm:col-span-3 p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden ${
+                  selectedMode === "cyber_gates"
+                    ? "border-cyan-500 bg-gradient-to-r from-cyan-950/90 via-slate-900 to-blue-950/90 text-white shadow-lg shadow-cyan-500/20"
+                    : "border-cyan-500/40 bg-card hover:border-cyan-400"
+                }`}
+              >
+                <div className="flex items-start sm:items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-400/50 text-cyan-400 flex items-center justify-center shrink-0">
+                    <Shield className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className={`font-black text-base ${selectedMode === "cyber_gates" ? "text-cyan-300" : "text-foreground"}`}>
+                        🛡️ Mật Vụ Toán Học: Giải Mã 5 Cánh Cổng Bí Ẩn
+                      </h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-extrabold uppercase">
+                        MỚI · CHẾ ĐỘ THỨ 7
+                      </span>
+                    </div>
+                    <p className={`text-xs leading-relaxed ${selectedMode === "cyber_gates" ? "text-slate-200" : "text-muted-foreground"}`}>
+                      Cả lớp hóa thân thành Đội Đặc Nhiệm Toán Học vượt qua lộ trình Zic-zắc 5 Cánh Cổng, mở Kính Lúp Manh Mối, nghe Giọng Đọc Trợ Lý AI, thu thập 5 Chìa Khóa Vàng &amp; ghép 5 Mảnh Khiên Hộ Vệ!
+                    </p>
+                  </div>
+                </div>
+                <div className={`text-[11px] font-extrabold uppercase tracking-wider shrink-0 px-3 py-1.5 rounded-xl border ${
+                  selectedMode === "cyber_gates"
+                    ? "border-amber-400/60 bg-amber-400/15 text-amber-300"
+                    : "border-cyan-500/30 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+                }`}>
+                  🔑 5 Cánh Cổng · Kính Lúp · Giọng Đọc AI
+                </div>
+              </div>
+
               {/* Mode 1: Race - Đường đua tri thức */}
               <div
                 onClick={() => handleSelectMode("race")}
@@ -328,12 +372,70 @@ function GamesContent() {
             </div>
           </div>
 
-          {/* 2. Choose Exam */}
+          {/* 2. Choose Exam or Preset Pack */}
+          {selectedMode === "cyber_gates" && (
+            <div className="space-y-3 pt-2">
+              <label className="text-sm font-bold text-foreground flex items-center gap-2">
+                <span>2A. Chọn Bộ Chuyên Đề 5 Cánh Cổng Toán THPT (Sẵn dùng kèm Hình Mô Phỏng SVG &amp; Kính Lúp Manh Mối):</span>
+                <span className="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 text-[10px] font-extrabold">
+                  KHUYÊN DÙNG
+                </span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                {CYBER_GATES_PACKS.map((pack) => {
+                  const isSelected = selectedExamId === pack.exam.id;
+                  return (
+                    <div
+                      key={pack.exam.id}
+                      onClick={() => setSelectedExamId(pack.exam.id)}
+                      className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                        isSelected
+                          ? "border-cyan-500 bg-cyan-950/90 text-white shadow-md shadow-cyan-500/20"
+                          : "border-border bg-card hover:border-cyan-400 text-foreground"
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            isSelected ? "bg-amber-400 text-slate-950" : "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300"
+                          }`}>
+                            {pack.packTag}
+                          </span>
+                          <span className={`text-[10px] font-bold ${isSelected ? "text-cyan-300" : "text-muted-foreground"}`}>
+                            5 Cổng · Lớp {pack.exam.targetClass}
+                          </span>
+                        </div>
+                        <div className="font-extrabold text-xs sm:text-sm leading-snug">
+                          {pack.exam.title}
+                        </div>
+                        <p className={`text-[11px] leading-relaxed ${isSelected ? "text-slate-300" : "text-muted-foreground"}`}>
+                          {pack.packSummary}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-cyan-500/20 text-[10px] font-bold">
+                        <span className={isSelected ? "text-emerald-300" : "text-muted-foreground"}>
+                          {pack.stages.map((s) => s.icon).join(" ")} 5 Mảnh Khiên
+                        </span>
+                        {isSelected && <span className="text-amber-300">✓ Đã chọn</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3 pt-2">
-            <label className="text-sm font-bold text-foreground">2. Chọn đề thi áp dụng:</label>
+            <label className="text-sm font-bold text-foreground">
+              {selectedMode === "cyber_gates" ? "2B. Hoặc chọn Đề thi bất kỳ từ Kho đề của bạn:" : "2. Chọn đề thi áp dụng:"}
+            </label>
             {exams.length === 0 ? (
               <div className="p-6 rounded-xl border border-dashed border-border bg-card text-xs text-muted-foreground text-center space-y-3">
-                <div>Chưa có đề thi nào trong hệ thống. Hãy tạo đề thi trước khi mở phòng game!</div>
+                <div>
+                  {selectedMode === "cyber_gates"
+                    ? "Bạn có thể dùng ngay 3 Bộ Chuyên Đề 5 Cánh Cổng ở mục 2A phía trên, hoặc tạo thêm đề thi riêng."
+                    : "Chưa có đề thi nào trong hệ thống. Hãy tạo đề thi trước khi mở phòng game!"}
+                </div>
                 <div>
                   <Link
                     href="/teacher/exams/create"

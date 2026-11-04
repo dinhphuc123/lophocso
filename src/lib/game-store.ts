@@ -1,11 +1,12 @@
 import { EventEmitter } from "node:events";
 import { Exam, PublicQuestion, Question } from "./types";
 import { getExamWithFallback } from "./db";
+import { getCyberGatesPresetExam } from "./cyber-gates-presets";
 import { toPublicQuestion } from "./sanitize";
 import { matchShort } from "./grader";
 import { getGameRoomAdapter } from "./redis-adapter";
 
-export type GameMode = "arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance";
+export type GameMode = "arena" | "bomb" | "farm" | "race" | "golden_bell" | "dance" | "cyber_gates";
 export type RoomState = "lobby" | "question" | "reveal" | "ended";
 
 export const BOMB_LIVES = 3;
@@ -17,7 +18,8 @@ const TIME_LIMIT: Record<GameMode, number> = {
   farm: 40,
   race: 20,         // Đường đua tri thức: Tốc độ cao
   golden_bell: 25,  // Rung chuông vàng: Quyết đấu loại trừ
-  dance: 15         // Vũ điệu tri thức: Nhịp điệu combo
+  dance: 15,        // Vũ điệu tri thức: Nhịp điệu combo
+  cyber_gates: 45   // Mật vụ 5 Cánh Cổng: Suy luận tình huống + Kính lúp manh mối
 };
 
 export interface GamePlayer {
@@ -58,6 +60,7 @@ export interface PlayerView extends Pick<GamePlayer, "id" | "name" | "avatar" | 
 /** What clients receive: current question without answer key; the answer only appears at reveal. */
 export interface RoomView {
   pin: string;
+  examId: string;
   examTitle: string;
   mode: GameMode;
   state: RoomState;
@@ -125,7 +128,7 @@ export function createRoomFromExam(exam: Exam, mode: GameMode): GameRoom {
 }
 
 export async function createGameRoom(examId: string, mode: GameMode): Promise<GameRoom> {
-  const exam = await getExamWithFallback(examId);
+  const exam = getCyberGatesPresetExam(examId) || (await getExamWithFallback(examId));
   if (!exam) throw new Error("Không tìm thấy đề thi");
   const room = createRoomFromExam(exam, mode);
   room.pin = await generatePin();
@@ -207,6 +210,7 @@ export function viewRoom(room: GameRoom): RoomView {
 
   return {
     pin: room.pin,
+    examId: room.examId,
     examTitle: room.examTitle,
     mode: room.mode,
     state: room.state,
@@ -301,7 +305,7 @@ export async function submitPlayerAnswer(pin: string, playerId: string, question
   }
   player.score += earnedScore;
   if (room.mode === "arena") room.bossHp = Math.max(0, room.bossHp - earnedScore);
-  if (room.mode === "farm" && isCorrect) player.crops += 1;
+  if ((room.mode === "farm" || room.mode === "cyber_gates") && isCorrect) player.crops += 1;
   player.lastAnswer = { questionIndex, isCorrect, earnedScore };
 
   tick(room);

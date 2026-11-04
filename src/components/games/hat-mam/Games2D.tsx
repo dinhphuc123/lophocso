@@ -1,6 +1,10 @@
 // @ts-nocheck
 "use client";
 
+import { CYBER_GATES_PACKS } from "@/lib/cyber-gates-presets";
+import { CyberScenarioSvg, CyberShieldTray, speakVietnameseText, stopVietnameseSpeech } from "@/components/games/CyberGatesView";
+import { MathText } from "@/components/MathText";
+
 import React, { useState, useEffect, useRef } from "react";
 import "./games2d.css";
 
@@ -1906,11 +1910,380 @@ function DaoHamNguyenHam({ finish, tone }) {
   );
 }
 
+function MatVuToanHoc({ finish, tone }) {
+  const [packIdx, setPackIdx] = useState(0);
+  const [screen, setScreen] = useState("title"); // "title" | "map" | "question" | "answer" | "finale"
+  const [detectiveName, setDetectiveName] = useState("Thám Tử Ánh Sao");
+  const [completedStages, setCompletedStages] = useState([]);
+  const [currentStageIdx, setCurrentStageIdx] = useState(0);
+  const [wrongKeys, setWrongKeys] = useState([]);
+  const [solved, setSolved] = useState(false);
+  const [clueOpen, setClueOpen] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  const pack = CYBER_GATES_PACKS[packIdx] || CYBER_GATES_PACKS[0];
+  const stageMeta = pack.stages[currentStageIdx] || pack.stages[0];
+  const question = pack.exam.questions[currentStageIdx];
+
+  useEffect(() => {
+    return () => stopVietnameseSpeech();
+  }, []);
+
+  function enterStage(idx) {
+    if (idx > completedStages.length) {
+      tone(280, 0.14);
+      return;
+    }
+    tone(580, 0.08);
+    stopVietnameseSpeech();
+    setSpeaking(false);
+    setCurrentStageIdx(idx);
+    setWrongKeys([]);
+    setSolved(false);
+    setClueOpen(false);
+    setScreen("question");
+  }
+
+  function chooseOption(optId) {
+    if (solved || !question || question.type !== "multiple_choice") return;
+    if (optId === question.correctAnswer) {
+      tone(740, 0.16);
+      setSolved(true);
+    } else {
+      tone(290, 0.16);
+      if (!wrongKeys.includes(optId)) setWrongKeys([...wrongKeys, optId]);
+    }
+  }
+
+  function unlockStageReward() {
+    tone(880, 0.2);
+    stopVietnameseSpeech();
+    setSpeaking(false);
+    if (!completedStages.includes(currentStageIdx)) {
+      setCompletedStages([...completedStages, currentStageIdx]);
+    }
+    setScreen("answer");
+  }
+
+  if (screen === "title") {
+    return (
+      <div className="p-4 sm:p-6 rounded-3xl bg-slate-950 text-white border-2 border-cyan-400 space-y-5 shadow-xl">
+        <div className="text-center space-y-1">
+          <div className="inline-block px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400 text-amber-300 text-xs font-extrabold uppercase">
+            🛡️ Chiến dịch Giải mã 5 Cánh Cổng Bí Ẩn (Mở khóa toàn bộ 5/5 Chặng)
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-cyan-300">MẬT VỤ TOÁN HỌC THPT</h2>
+          <p className="text-xs sm:text-sm text-slate-300">
+            Chọn 1 trong 3 Bộ chuyên đề, vượt qua lộ trình Zic-zắc 5 Cánh Cổng, mở Kính Lúp Manh Mối &amp; khôi phục Lá Chắn An Toàn!
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-extrabold uppercase text-cyan-300">1. Chọn Bộ Chuyên Đề 5 Cánh Cổng:</label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {CYBER_GATES_PACKS.map((p, idx) => (
+              <button
+                key={p.exam.id}
+                type="button"
+                onClick={() => {
+                  tone(540, 0.07);
+                  setPackIdx(idx);
+                  setCompletedStages([]);
+                }}
+                className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                  packIdx === idx
+                    ? "border-amber-400 bg-cyan-950 text-white shadow-md"
+                    : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-cyan-500/50"
+                }`}
+              >
+                <div className="text-[10px] font-extrabold uppercase text-amber-300">{p.packTag}</div>
+                <div className="font-bold text-xs sm:text-sm mt-1">{p.exam.title}</div>
+                <div className="text-[11px] text-slate-400 mt-1 line-clamp-2">{p.packSummary}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+          <input
+            type="text"
+            value={detectiveName}
+            onChange={(e) => setDetectiveName(e.target.value)}
+            placeholder="Nhập biệt danh Thám tử của em..."
+            className="flex-1 px-4 py-3 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-sm font-bold"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              tone(660, 0.12);
+              setScreen("map");
+            }}
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-sm cursor-pointer shadow-lg"
+          >
+            🚀 BẮT ĐẦU HÀNH TRÌNH 5 CỔNG
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === "map") {
+    const allDone = completedStages.length >= 5;
+    return (
+      <div className="p-4 sm:p-6 rounded-3xl bg-slate-950 text-white border-2 border-cyan-400 space-y-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+          <div>
+            <div className="text-[11px] font-extrabold text-cyan-300 uppercase">{pack.packTag}</div>
+            <div className="text-base sm:text-lg font-black text-white">🕵️ {detectiveName} · Bản Đồ Hành Trình 5 Cánh Cổng</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <CyberShieldTray unlockedCount={completedStages.length} totalGates={5} />
+            <button
+              type="button"
+              onClick={() => setScreen("title")}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 cursor-pointer"
+            >
+              Đổi chuyên đề
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          {pack.stages.map((st, idx) => {
+            const isDone = completedStages.includes(idx);
+            const isUnlocked = idx <= completedStages.length;
+            return (
+              <div
+                key={st.stageNumber}
+                onClick={() => enterStage(idx)}
+                className={`p-3.5 rounded-2xl border-2 flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                  isDone
+                    ? "border-emerald-400 bg-emerald-950/50"
+                    : isUnlocked
+                    ? "border-cyan-400 bg-cyan-950/60 shadow-md"
+                    : "border-slate-800 bg-slate-900/60 opacity-60"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full bg-slate-900 border-2 border-current flex items-center justify-center text-xl">
+                    {isDone ? "✓" : isUnlocked ? st.icon : "🔒"}
+                  </div>
+                  <div>
+                    <div className="font-black text-sm text-white">{st.gateTitle}</div>
+                    <div className="text-xs text-slate-300">{st.gateSubtitle}</div>
+                  </div>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-slate-900 border border-slate-700 text-amber-300">
+                  {isDone ? "Đã mở khóa (Chơi lại)" : isUnlocked ? "Vào giải mã ➔" : "Đang khóa"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {allDone && (
+          <button
+            type="button"
+            onClick={() => finish({ score: 5, total: 5 })}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-sm uppercase tracking-wider cursor-pointer shadow-lg"
+          >
+            🏆 KÍCH HOẠT CỔNG KHÁM PHÁ LỚN (HOÀN THÀNH 5/5 MẢNH KHIÊN)
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (screen === "answer" && question && question.type === "multiple_choice") {
+    const correctOpt = question.options.find((o) => o.id === question.correctAnswer);
+    return (
+      <div className="p-4 sm:p-6 rounded-3xl bg-slate-950 text-white border-2 border-emerald-400 space-y-4 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="font-black text-lg text-emerald-300">🔓 GIẢI MÃ THÀNH CÔNG · {stageMeta.gateTitle}</div>
+          <CyberShieldTray unlockedCount={completedStages.length} totalGates={5} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="lg:col-span-7 space-y-3">
+            <div className="p-3.5 rounded-2xl bg-emerald-950/70 border border-emerald-400">
+              <div className="text-xs font-extrabold text-emerald-300 uppercase">✅ Đáp án chính xác:</div>
+              <div className="text-base font-bold text-white mt-1">
+                {correctOpt?.id}. <MathText content={correctOpt?.text || ""} />
+              </div>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-slate-900 border border-cyan-500/40 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-cyan-300 uppercase">💡 Phát hiện kiến thức (Giải thích):</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (speaking) {
+                      stopVietnameseSpeech();
+                      setSpeaking(false);
+                    } else {
+                      setSpeaking(true);
+                      speakVietnameseText(`${stageMeta.mentorPraise}. ${question.explanation || ""}`, () => setSpeaking(false));
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-cyan-500/20 border border-cyan-400 text-[11px] font-bold text-cyan-100 cursor-pointer"
+                >
+                  {speaking ? "⏹️ Dừng đọc" : "🔊 Nghe giải thích"}
+                </button>
+              </div>
+              <div className="text-sm text-slate-100 leading-relaxed">
+                <MathText content={question.explanation || ""} />
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-5 p-4 rounded-2xl bg-amber-950/40 border-2 border-amber-400 text-center flex flex-col justify-between space-y-3">
+            <div className="text-xs font-extrabold uppercase text-amber-300">🏆 Phần thưởng mở khóa cổng</div>
+            <div className="text-4xl">🔑 ➔ 🛡️</div>
+            <div className="p-2.5 rounded-xl bg-slate-950 border border-amber-400/50">
+              <div className="text-[10px] uppercase text-cyan-300 font-bold">Mật mã quy tắc thu thập được:</div>
+              <div className="text-xs sm:text-sm font-black text-amber-300 mt-1">{stageMeta.ruleCode}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setScreen("map")}
+              className="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm uppercase cursor-pointer"
+            >
+              🗺️ Quay về Bản đồ hành trình
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 sm:p-6 rounded-3xl bg-slate-950 text-white border-2 border-cyan-400 space-y-4 shadow-xl">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs">
+            CỔNG {stageMeta.stageNumber}/5
+          </span>
+          <span className="font-black text-base sm:text-lg text-amber-300">{stageMeta.gateTitle}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <CyberShieldTray unlockedCount={completedStages.length} totalGates={5} />
+          <button
+            type="button"
+            onClick={() => setScreen("map")}
+            className="px-3 py-1 rounded-xl bg-slate-800 text-xs font-bold text-cyan-200 cursor-pointer"
+          >
+            🗺️ Bản đồ
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <div className="lg:col-span-5 space-y-3">
+          <div className="p-3 rounded-2xl bg-slate-900 border border-cyan-500/40 space-y-2">
+            <div className="text-xs font-bold text-cyan-300 uppercase">🖥️ Mô phỏng tình huống thực tế</div>
+            <CyberScenarioSvg svgType={stageMeta.svgType} />
+          </div>
+          <div className="p-3 rounded-2xl bg-indigo-950/80 border border-amber-400/50 text-xs text-amber-100 italic">
+            💭 <strong>Gợi ý suy nghĩ:</strong> {stageMeta.thinkingPrompt}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              tone(620, 0.1);
+              setClueOpen(!clueOpen);
+            }}
+            className="w-full py-2.5 px-3 rounded-xl bg-amber-500/20 border-2 border-amber-400 text-amber-200 font-bold text-xs cursor-pointer"
+          >
+            🔍 {clueOpen ? "Ẩn Kính Lúp Manh Mối" : "Bấm mở Kính Lúp Manh Mối"}
+          </button>
+          {clueOpen && (
+            <div className="p-3 rounded-xl bg-amber-950/75 border border-amber-400 text-xs text-slate-100 leading-relaxed">
+              <strong className="text-amber-300">🔍 Phân tích:</strong> {stageMeta.clueText}
+            </div>
+          )}
+        </div>
+
+        <div className="lg:col-span-7 space-y-3">
+          <div className="p-4 rounded-2xl bg-slate-900 border-2 border-cyan-400/70 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-cyan-300 uppercase">📋 Tình huống &amp; Câu hỏi nhiệm vụ:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (speaking) {
+                    stopVietnameseSpeech();
+                    setSpeaking(false);
+                  } else {
+                    setSpeaking(true);
+                    speakVietnameseText(`${stageMeta.gateTitle}. ${question?.text || ""}`, () => setSpeaking(false));
+                  }
+                }}
+                className="px-2.5 py-1 rounded-full bg-cyan-500/20 border border-cyan-400 text-[11px] font-bold text-cyan-100 cursor-pointer"
+              >
+                {speaking ? "⏹️ Dừng đọc" : "🔊 Nghe đề bài"}
+              </button>
+            </div>
+            <div className="text-sm sm:text-base font-bold text-white leading-relaxed">
+              <MathText content={question?.text || ""} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {question?.type === "multiple_choice" &&
+              question.options.map((opt) => {
+                const isWrong = wrongKeys.includes(opt.id);
+                const isRight = solved && opt.id === question.correctAnswer;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => chooseOption(opt.id)}
+                    className={`w-full p-3 rounded-2xl border-2 text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      isRight
+                        ? "border-emerald-400 bg-emerald-950/80 text-white"
+                        : isWrong
+                        ? "border-rose-500/60 bg-rose-950/40 text-rose-200 opacity-75"
+                        : "border-cyan-500/40 bg-slate-900 hover:border-cyan-300 text-slate-100"
+                    }`}
+                  >
+                    <span className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center font-black text-xs shrink-0">
+                      {isRight ? "✓" : isWrong ? "!" : opt.id}
+                    </span>
+                    <span className="text-xs sm:text-sm font-semibold">
+                      <MathText content={opt.text} />
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+
+          {wrongKeys.length > 0 && !solved && (
+            <div className="p-3 rounded-xl bg-amber-950/80 border border-amber-400 text-xs text-amber-100">
+              💡 Phương án vừa chọn vẫn còn bẫy toán học! Hãy mở <strong>Kính Lúp Manh Mối</strong> ở cột trái để kiểm tra lại công thức nhé!
+            </div>
+          )}
+
+          {solved && (
+            <button
+              type="button"
+              onClick={unlockStageReward}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-sm uppercase tracking-wider cursor-pointer shadow-lg"
+            >
+              ✨ TIẾP TỤC → XEM GIẢI MÃ &amp; NHẬN MẢNH KHIÊN #{stageMeta.stageNumber}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const COMPONENTS = {
   "doan-do-thi": DoanDoThi,
   "vong-tron-luong-giac": VongTronLuongGiac,
   "vecto-oxyz": VectoOxyz,
   "dao-ham-nguyen-ham": DaoHamNguyenHam,
+  "mat-vu-toan-hoc": MatVuToanHoc,
   "o-an-quan": OAnQuan,
   "ghep-chu": Words,
   "lat-the": Memory,

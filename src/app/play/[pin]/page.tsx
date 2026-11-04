@@ -13,6 +13,8 @@ import {
   Heart
 } from "lucide-react";
 import { RoomView, PlayerView } from "@/lib/game-store";
+import { getCyberGateStageMeta } from "@/lib/cyber-gates-presets";
+import { CyberShieldTray } from "@/components/games/CyberGatesView";
 import { playSfx, launchConfetti, triggerHaptic } from "@/lib/effects";
 import { getAvatarInfo } from "@/lib/avatars";
 
@@ -31,6 +33,7 @@ function PlaySessionContent({ pin }: { pin: string }) {
   const [hasSubmittedThisQ, setHasSubmittedThisQ] = useState(false);
   const [shortAnswerInput, setShortAnswerInput] = useState("");
   const [tfAnswers, setTfAnswers] = useState<Record<string, boolean>>({});
+  const [studentClueOpen, setStudentClueOpen] = useState(false);
 
   // 1. Join room (persisting player id across page reloads)
   useEffect(() => {
@@ -123,6 +126,7 @@ function PlaySessionContent({ pin }: { pin: string }) {
       setHasSubmittedThisQ(false);
       setShortAnswerInput("");
       setTfAnswers({});
+      setStudentClueOpen(false);
     }
   }, [currentIdx, prevIdx]);
 
@@ -278,9 +282,21 @@ function PlaySessionContent({ pin }: { pin: string }) {
               {isCorrect ? "CHÍNH XÁC!" : "CHƯA ĐÚNG!"}
             </h2>
             {isCorrect && (
-              <div className="text-base font-bold text-amber-300 flex items-center justify-center gap-1.5">
-                <Flame className="w-4 h-4 fill-amber-300" />
-                <span>+{earned} ĐIỂM (Chuỗi x{player.streak})</span>
+              <div className="space-y-2">
+                <div className="text-base font-bold text-amber-300 flex items-center justify-center gap-1.5">
+                  <Flame className="w-4 h-4 fill-amber-300" />
+                  <span>+{earned} ĐIỂM (Chuỗi x{player.streak})</span>
+                </div>
+                {room.mode === "cyber_gates" && (
+                  <div className="p-3 rounded-2xl bg-emerald-900/60 border border-amber-400/60 max-w-xs mx-auto space-y-1">
+                    <div className="text-xs font-extrabold text-amber-300">
+                      🔑 +1 Chìa Khóa Vàng &amp; Mảnh Khiên ({player.crops}/5)
+                    </div>
+                    <div className="text-[11px] text-emerald-100 font-semibold">
+                      {getCyberGateStageMeta(room.examId, room.currentQuestionIndex).ruleCode}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {!isCorrect && (
@@ -293,6 +309,8 @@ function PlaySessionContent({ pin }: { pin: string }) {
                   ? "😢 Chuỗi combo bị phá vỡ! Lấy lại nhịp nào!"
                   : room.mode === "race"
                   ? "🏎️ Trượt! Đối thủ đang bứt phá về đích rồi!"
+                  : room.mode === "cyber_gates"
+                  ? "🔒 Chưa mở được ổ khóa cổng này! Hãy xem giải mã trên màn hình chiếu nhé!"
                   : "Đừng nản, tập trung cho câu tiếp theo nhé!"}
               </p>
             )}
@@ -429,6 +447,9 @@ function PlaySessionContent({ pin }: { pin: string }) {
             {room.mode === "race" && (
               <span className="text-blue-400 font-bold text-xs">🏎️ {player.score} km/h</span>
             )}
+            {room.mode === "cyber_gates" && (
+              <CyberShieldTray unlockedCount={player.crops ?? 0} totalGates={Math.min(5, room.totalQuestions)} />
+            )}
             <span className="text-slate-300">{player.name}</span>
             <span className="font-mono text-amber-300 bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
               {player.score} đ
@@ -464,6 +485,34 @@ function PlaySessionContent({ pin }: { pin: string }) {
       ) : (
         /* Action buttons for answering */
         <div className="my-auto w-full max-w-md mx-auto space-y-3">
+          {room.mode === "cyber_gates" && (() => {
+            const meta = getCyberGateStageMeta(room.examId, room.currentQuestionIndex);
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-2xl bg-cyan-950/75 border border-cyan-500/40 text-xs">
+                  <span className="font-extrabold text-cyan-300 truncate">
+                    {meta.icon} {meta.gateTitle}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic("tap");
+                      setStudentClueOpen((v) => !v);
+                    }}
+                    className="px-2.5 py-1 rounded-full bg-amber-500/25 border border-amber-400 text-[11px] font-bold text-amber-200 shrink-0 cursor-pointer"
+                  >
+                    🔍 {studentClueOpen ? "Ẩn Manh Mối" : "Kính Lúp Manh Mối"}
+                  </button>
+                </div>
+                {studentClueOpen && (
+                  <div className="p-3 rounded-2xl bg-amber-950/85 border border-amber-400 text-xs text-amber-100 leading-relaxed">
+                    <strong className="text-amber-300">🔍 Manh mối:</strong> {meta.clueText}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* MULTIPLE CHOICE */}
           {(!currentQ || currentQ.type === "multiple_choice") && (
             <div className="grid grid-cols-2 gap-3.5 h-[65vh]">
