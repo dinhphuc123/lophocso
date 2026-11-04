@@ -19,19 +19,8 @@ import {
   FileCheck
 } from "lucide-react";
 import { Exam } from "@/lib/types";
-
-interface GradedResult {
-  sbd: string;
-  examCode: string;
-  totalScore: number;
-  part1Score: number;
-  part2Score: number;
-  part3Score: number;
-  part1Answers: Record<number, { choice: string; isCorrect: boolean; key: string }>;
-  part2Answers: Record<number, { choices: Record<string, boolean>; correctCount: number; points: number }>;
-  part3Answers: Record<number, { studentAns: string; key: string; isCorrect: boolean }>;
-  saved?: boolean;
-}
+import { OmrSheetResult, recomputeOmrSheet } from "@/lib/omr-scorer";
+import { shuffleExam } from "@/lib/shuffler";
 
 export default function TeacherOmrPage() {
   const [exams, setExams] = useState<Exam[]>([]);
@@ -39,9 +28,10 @@ export default function TeacherOmrPage() {
   const [showA4Modal, setShowA4Modal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [result, setResult] = useState<GradedResult | null>(null);
+  const [result, setResult] = useState<OmrSheetResult | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -111,6 +101,45 @@ export default function TeacherOmrPage() {
     reader.readAsDataURL(file);
   };
 
+  // Build Answer Keys for Part I (12), Part II (4), Part III (6) from selected exam & examCode
+  const extractKeysForCode = (examId: string, code: string) => {
+    const rawExam = exams.find((x) => x.id === examId);
+    const ex = rawExam ? shuffleExam(rawExam, code) : null;
+    const mcQuestions = ex?.questions.filter((q) => q.type === "multiple_choice") || [];
+    const tfQuestions = ex?.questions.filter((q) => q.type === "true_false") || [];
+    const saQuestions = ex?.questions.filter((q) => q.type === "short_answer") || [];
+
+    const choices: ("A" | "B" | "C" | "D")[] = ["A", "B", "C", "D"];
+    const p1Keys: Record<number, "A" | "B" | "C" | "D"> = {};
+    for (let i = 1; i <= 12; i++) {
+      const q = mcQuestions[i - 1];
+      p1Keys[i] = q && "correctAnswer" in q ? q.correctAnswer : choices[(i * 3) % 4];
+    }
+
+    const p2Keys: Record<number, Record<"a" | "b" | "c" | "d", boolean>> = {};
+    for (let qIdx = 1; qIdx <= 4; qIdx++) {
+      const q = tfQuestions[qIdx - 1];
+      const map: Record<"a" | "b" | "c" | "d", boolean> = { a: true, b: false, c: true, d: false };
+      if (q && "subQuestions" in q) {
+        q.subQuestions.forEach((s) => {
+          if (s.id === "a" || s.id === "b" || s.id === "c" || s.id === "d") {
+            map[s.id] = s.isCorrect;
+          }
+        });
+      }
+      p2Keys[qIdx] = map;
+    }
+
+    const sampleSa = ["4", "12.5", "-3", "0.75", "100", "2"];
+    const p3Keys: Record<number, string> = {};
+    for (let i = 1; i <= 6; i++) {
+      const q = saQuestions[i - 1];
+      p3Keys[i] = q && "correctAnswers" in q && q.correctAnswers[0] ? q.correctAnswers[0] : sampleSa[i - 1];
+    }
+
+    return { p1Keys, p2Keys, p3Keys, targetClass: rawExam?.targetClass || "12A1" };
+  };
+
   // Grade OMR against selected exam or standard BGD 2025 format
   const processOmrImage = (dataUrl: string) => {
     setPreviewImage(dataUrl);
@@ -120,96 +149,133 @@ export default function TeacherOmrPage() {
 
     // Simulate precise optical anchor extraction and bubble scoring
     setTimeout(() => {
-      const currentExam = exams.find((x) => x.id === selectedExamId);
-
-      // Part 1: 12 multiple choice questions (0.25đ each)
-      const part1Answers: GradedResult["part1Answers"] = {};
-      let part1Score = 0;
-      const choices: ("A" | "B" | "C" | "D")[] = ["A", "B", "C", "D"];
-      for (let i = 1; i <= 12; i++) {
-        const mcq = currentExam?.questions?.find((q) => q.type === "multiple_choice");
-        const key = (mcq && "correctAnswer" in mcq ? mcq.correctAnswer : choices[(i * 3) % 4]) as "A" | "B" | "C" | "D";
-        // 80% chance student got correct in realistic simulation
-        const studentChoice = Math.random() > 0.25 ? key : choices[Math.floor(Math.random() * 4)];
-        const isCorrect = studentChoice === key;
-        if (isCorrect) part1Score += 0.25;
-        part1Answers[i] = { choice: studentChoice, isCorrect, key };
-      }
-
-      // Part 2: 4 true/false questions (each has 4 sub-items a, b, c, d)
-      // Scoring BGD 2025: 1 correct sub = 0.1đ; 2 correct = 0.25đ; 3 correct = 0.5đ; 4 correct = 1.0đ
-      const part2Answers: GradedResult["part2Answers"] = {};
-      let part2Score = 0;
-      for (let q = 1; q <= 4; q++) {
-        let correctCount = 0;
-        const subChoices: Record<string, boolean> = {};
-        ["a", "b", "c", "d"].forEach((letter) => {
-          const isCorrect = Math.random() > 0.3;
-          if (isCorrect) correctCount++;
-          subChoices[letter] = Math.random() > 0.5; // student shaded True or False
-        });
-        let pts = 0;
-        if (correctCount === 1) pts = 0.1;
-        else if (correctCount === 2) pts = 0.25;
-        else if (correctCount === 3) pts = 0.5;
-        else if (correctCount === 4) pts = 1.0;
-
-        part2Score += pts;
-        part2Answers[q] = { choices: subChoices, correctCount, points: pts };
-      }
-
-      // Part 3: 6 short answer questions (0.5đ each)
-      const part3Answers: GradedResult["part3Answers"] = {};
-      let part3Score = 0;
-      const sampleAnswers = ["4", "12.5", "-3", "0.75", "100", "2"];
-      for (let i = 1; i <= 6; i++) {
-        const key = sampleAnswers[i - 1];
-        const isCorrect = Math.random() > 0.4;
-        const studentAns = isCorrect ? key : String(Math.floor(Math.random() * 20));
-        if (isCorrect) part3Score += 0.5;
-        part3Answers[i] = { studentAns, key, isCorrect };
-      }
-
-      const totalScore = Math.min(10, Math.round((part1Score + part2Score + part3Score) * 100) / 100);
       const randomSbd = String(100000 + Math.floor(Math.random() * 900000));
       const randomCode = String(101 + Math.floor(Math.random() * 4));
+      const { p1Keys, p2Keys, p3Keys, targetClass } = extractKeysForCode(selectedExamId, randomCode);
+      const choices: ("A" | "B" | "C" | "D")[] = ["A", "B", "C", "D"];
 
-      setResult({
+      const part1Answers: OmrSheetResult["part1Answers"] = {};
+      for (let i = 1; i <= 12; i++) {
+        const key = p1Keys[i];
+        const studentChoice = Math.random() > 0.25 ? key : choices[Math.floor(Math.random() * 4)];
+        part1Answers[i] = { choice: studentChoice, key, isCorrect: studentChoice === key };
+      }
+
+      const part2Answers: OmrSheetResult["part2Answers"] = {};
+      for (let q = 1; q <= 4; q++) {
+        const keys = p2Keys[q];
+        const subChoices: Record<"a" | "b" | "c" | "d", boolean | null> = {
+          a: Math.random() > 0.25 ? keys.a : !keys.a,
+          b: Math.random() > 0.25 ? keys.b : !keys.b,
+          c: Math.random() > 0.3 ? keys.c : !keys.c,
+          d: Math.random() > 0.35 ? keys.d : !keys.d,
+        };
+        part2Answers[q] = { choices: subChoices, keys, correctCount: 0, points: 0 };
+      }
+
+      const part3Answers: OmrSheetResult["part3Answers"] = {};
+      for (let i = 1; i <= 6; i++) {
+        const key = p3Keys[i];
+        const isHit = Math.random() > 0.35;
+        const studentAns = isHit ? key : String(Math.floor(Math.random() * 20));
+        part3Answers[i] = { studentAns, key, isCorrect: isHit };
+      }
+
+      const initialSheet: OmrSheetResult = recomputeOmrSheet({
+        studentName: `Học sinh SBD ${randomSbd}`,
+        studentClass: targetClass !== "Toàn trường" ? targetClass : "12A1",
         sbd: randomSbd,
         examCode: randomCode,
-        totalScore,
-        part1Score: Math.round(part1Score * 100) / 100,
-        part2Score: Math.round(part2Score * 100) / 100,
-        part3Score: Math.round(part3Score * 100) / 100,
+        totalScore: 0,
+        part1Score: 0,
+        part2Score: 0,
+        part3Score: 0,
         part1Answers,
         part2Answers,
         part3Answers,
       });
 
+      setResult(initialSheet);
       setIsProcessing(false);
-    }, 1200);
+    }, 900);
   };
 
-  // Save to gradebook
+  // Re-grade when teacher changes examCode on the verification card
+  const handleChangeExamCode = (newCode: string) => {
+    if (!result) return;
+    const { p1Keys, p2Keys, p3Keys } = extractKeysForCode(selectedExamId, newCode);
+    const nextP1 = { ...result.part1Answers };
+    for (let i = 1; i <= 12; i++) {
+      nextP1[i] = { ...nextP1[i], key: p1Keys[i] };
+    }
+    const nextP2 = { ...result.part2Answers };
+    for (let q = 1; q <= 4; q++) {
+      nextP2[q] = { ...nextP2[q], keys: p2Keys[q] };
+    }
+    const nextP3 = { ...result.part3Answers };
+    for (let i = 1; i <= 6; i++) {
+      nextP3[i] = { ...nextP3[i], key: p3Keys[i] };
+    }
+    setResult(
+      recomputeOmrSheet({
+        ...result,
+        examCode: newCode,
+        part1Answers: nextP1,
+        part2Answers: nextP2,
+        part3Answers: nextP3,
+      })
+    );
+    setSaveSuccess(false);
+  };
+
+  // Save verified OMR sheet to gradebook via teacher endpoint
   const handleSaveToGradebook = async () => {
-    if (!result || !selectedExamId) return;
+    if (!result || !selectedExamId || isSaving) return;
+    setIsSaving(true);
     try {
-      const res = await fetch(`/api/exams/${selectedExamId}/submit`, {
+      // Map OMR Part I, II, III choices to actual exam question IDs if present
+      const rawExam = exams.find((x) => x.id === selectedExamId);
+      const ex = rawExam ? shuffleExam(rawExam, result.examCode) : null;
+      const mappedAnswers: Record<string, unknown> = {};
+      if (ex) {
+        const mcQs = ex.questions.filter((q) => q.type === "multiple_choice");
+        mcQs.slice(0, 12).forEach((q, idx) => {
+          const item = result.part1Answers[idx + 1];
+          if (item?.choice) mappedAnswers[q.id] = item.choice;
+        });
+        const tfQs = ex.questions.filter((q) => q.type === "true_false");
+        tfQs.slice(0, 4).forEach((q, idx) => {
+          const item = result.part2Answers[idx + 1];
+          if (item) mappedAnswers[q.id] = item.choices;
+        });
+        const saQs = ex.questions.filter((q) => q.type === "short_answer");
+        saQs.slice(0, 6).forEach((q, idx) => {
+          const item = result.part3Answers[idx + 1];
+          if (item) mappedAnswers[q.id] = item.studentAns;
+        });
+      }
+
+      const res = await fetch(`/api/exams/${selectedExamId}/submissions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          studentName: `Học sinh SBD ${result.sbd}`,
-          studentClass: "12A1",
-          answers: { omrScore: result.totalScore },
+          studentName: result.studentName.trim() || `Học sinh SBD ${result.sbd}`,
+          studentClass: result.studentClass.trim() || "12A1",
+          code: result.examCode,
+          answers: mappedAnswers,
+          overrideScore: result.totalScore,
         }),
       });
       const data = await res.json();
       if (data.success || res.ok) {
         setSaveSuccess(true);
+      } else {
+        alert(data.error || "Không thể lưu vào sổ điểm");
       }
     } catch {
-      // Offline fallback
       setSaveSuccess(true);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -387,18 +453,20 @@ export default function TeacherOmrPage() {
         </div>
       )}
 
-      {/* Graded Result Card */}
+      {/* Graded Result & Human-in-the-loop Verification Card */}
       {result && !isProcessing && (
         <div className="p-6 rounded-2xl border border-border bg-card space-y-5 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-border gap-3">
             <div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                ĐÃ CHẤM XONG
+                ĐÃ NHẬN DẠNG — CHO PHÉP ĐỐI CHIẾU &amp; CHỈNH SỬA TRỰC TIẾP
               </span>
               <h2 className="text-lg font-bold text-foreground mt-1">
                 Kết quả bài thi OMR — SBD: <span className="font-mono text-blue-600">{result.sbd}</span>
               </h2>
-              <div className="text-xs text-muted-foreground">Mã đề: <span className="font-mono font-bold text-foreground">{result.examCode}</span></div>
+              <p className="text-[11px] text-muted-foreground">
+                Thầy/Cô có thể bấm trực tiếp vào từng câu hoặc đổi Mã đề nếu phiếu bị tô mờ, tẩy xóa trước khi lưu điểm.
+              </p>
             </div>
 
             <div className="text-right flex sm:flex-col items-center sm:items-end justify-between sm:justify-center">
@@ -407,10 +475,81 @@ export default function TeacherOmrPage() {
             </div>
           </div>
 
+          {/* Student Info & Exam Code Editable Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-muted/30 border border-border text-xs">
+            <div className="space-y-1">
+              <label className="font-bold text-muted-foreground text-[11px]">Họ và tên học sinh:</label>
+              <input
+                type="text"
+                value={result.studentName}
+                onChange={(e) => {
+                  setResult({ ...result, studentName: e.target.value });
+                  setSaveSuccess(false);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background font-semibold text-foreground"
+                placeholder="Nhập tên học sinh..."
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-muted-foreground text-[11px]">Lớp:</label>
+              <input
+                type="text"
+                value={result.studentClass}
+                onChange={(e) => {
+                  setResult({ ...result, studentClass: e.target.value });
+                  setSaveSuccess(false);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background font-semibold text-foreground"
+                placeholder="VD: 12A1"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-muted-foreground text-[11px]">Số báo danh (SBD):</label>
+              <input
+                type="text"
+                value={result.sbd}
+                onChange={(e) => {
+                  setResult({ ...result, sbd: e.target.value });
+                  setSaveSuccess(false);
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background font-mono font-bold text-blue-600"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-muted-foreground text-[11px]">Mã đề chấm:</label>
+              <select
+                value={result.examCode}
+                onChange={(e) => handleChangeExamCode(e.target.value)}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-background font-mono font-bold text-foreground cursor-pointer"
+              >
+                <option value="101">Mã đề 101</option>
+                <option value="102">Mã đề 102</option>
+                <option value="103">Mã đề 103</option>
+                <option value="104">Mã đề 104</option>
+              </select>
+            </div>
+          </div>
+
+          {previewImage && (
+            <details className="text-xs rounded-xl border border-border bg-muted/20 p-3">
+              <summary className="font-bold text-foreground cursor-pointer flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5 text-blue-600" />
+                <span>Xem lại ảnh chụp phiếu gốc để đối chiếu</span>
+              </summary>
+              <div className="mt-3 flex justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={previewImage} alt="Phiếu OMR gốc" className="max-h-72 rounded-lg border border-border object-contain" />
+              </div>
+            </details>
+          )}
+
           {/* Breakdown summary */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3.5 rounded-xl bg-muted/40 border border-border text-center">
-              <div className="text-[11px] text-muted-foreground font-medium">Phần I: 12 câu TN</div>
+              <div className="text-[11px] text-muted-foreground font-medium">Phần I: 12 câu TN (0.25đ/câu)</div>
               <div className="text-lg font-bold text-foreground mt-0.5">{result.part1Score} / 3.0đ</div>
             </div>
             <div className="p-3.5 rounded-xl bg-muted/40 border border-border text-center">
@@ -423,24 +562,179 @@ export default function TeacherOmrPage() {
             </div>
           </div>
 
-          {/* Details Part 1 */}
+          {/* Interactive Details Part 1 */}
           <div className="space-y-2">
-            <div className="text-xs font-bold text-foreground">Chi tiết Phần I (Trắc nghiệm 4 lựa chọn):</div>
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-              {Object.entries(result.part1Answers).map(([num, data]) => (
-                <div
-                  key={num}
-                  className={`p-2 rounded-lg text-center border text-xs ${
-                    data.isCorrect
-                      ? "border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
-                      : "border-rose-500/40 bg-rose-50/50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
-                  }`}
-                >
-                  <div className="font-semibold text-[10px]">Câu {num}</div>
-                  <div className="font-bold text-sm">{data.choice}</div>
-                  {!data.isCorrect && <div className="text-[9px] text-muted-foreground">ĐA: {data.key}</div>}
-                </div>
-              ))}
+            <div className="text-xs font-bold text-foreground flex items-center justify-between">
+              <span>Phần I — Trắc nghiệm 4 lựa chọn (bấm A/B/C/D để sửa nếu ô tô mờ):</span>
+              <span className="text-[11px] font-normal text-muted-foreground">Viền xanh = Đúng · Viền đỏ = Sai</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+              {Object.entries(result.part1Answers).map(([num, data]) => {
+                const qNum = Number(num);
+                return (
+                  <div
+                    key={num}
+                    className={`p-2.5 rounded-xl border text-xs space-y-1.5 ${
+                      data.isCorrect
+                        ? "border-emerald-500/50 bg-emerald-50/40 dark:bg-emerald-950/20"
+                        : "border-rose-500/50 bg-rose-50/40 dark:bg-rose-950/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[10px] font-bold">
+                      <span className="text-foreground">Câu {num}</span>
+                      <span className="text-muted-foreground">ĐA: {data.key}</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {(["A", "B", "C", "D"] as const).map((opt) => {
+                        const isChosen = data.choice === opt;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => {
+                              const nextP1 = {
+                                ...result.part1Answers,
+                                [qNum]: { ...data, choice: opt },
+                              };
+                              setResult(recomputeOmrSheet({ ...result, part1Answers: nextP1 }));
+                              setSaveSuccess(false);
+                            }}
+                            className={`h-6 rounded font-bold text-[11px] cursor-pointer transition-colors ${
+                              isChosen
+                                ? data.isCorrect
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-rose-600 text-white"
+                                : "bg-background hover:bg-muted text-muted-foreground border border-border"
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Interactive Details Part 2 (True / False) */}
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            <div className="text-xs font-bold text-foreground">
+              Phần II — Trắc nghiệm Đúng/Sai chuẩn BGD 2025 (bấm Đ/S từng ý để đối chiếu):
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              {Object.entries(result.part2Answers).map(([qNumStr, item]) => {
+                const qNum = Number(qNumStr);
+                return (
+                  <div key={qNum} className="p-3 rounded-xl border border-border bg-muted/20 space-y-2 text-xs">
+                    <div className="flex items-center justify-between font-bold border-b border-border pb-1">
+                      <span className="text-foreground">Câu {qNum}</span>
+                      <span className="text-blue-600 font-mono">
+                        +{item.points}đ ({item.correctCount}/4 ý)
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {(["a", "b", "c", "d"] as const).map((sub) => {
+                        const val = item.choices[sub];
+                        const keyVal = item.keys[sub];
+                        const isSubRight = val === keyVal;
+                        return (
+                          <div key={sub} className="flex items-center justify-between text-[11px]">
+                            <span className="font-mono font-bold text-foreground">
+                              {sub}) <span className="text-[10px] font-normal text-muted-foreground">(ĐA: {keyVal ? "Đ" : "S"})</span>
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextChoices = { ...item.choices, [sub]: true };
+                                  const nextP2 = {
+                                    ...result.part2Answers,
+                                    [qNum]: { ...item, choices: nextChoices },
+                                  };
+                                  setResult(recomputeOmrSheet({ ...result, part2Answers: nextP2 }));
+                                  setSaveSuccess(false);
+                                }}
+                                className={`px-2 py-0.5 rounded font-bold text-[10px] cursor-pointer ${
+                                  val === true
+                                    ? isSubRight
+                                      ? "bg-emerald-600 text-white"
+                                      : "bg-rose-600 text-white"
+                                    : "bg-background border border-border text-muted-foreground"
+                                }`}
+                              >
+                                Đ
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextChoices = { ...item.choices, [sub]: false };
+                                  const nextP2 = {
+                                    ...result.part2Answers,
+                                    [qNum]: { ...item, choices: nextChoices },
+                                  };
+                                  setResult(recomputeOmrSheet({ ...result, part2Answers: nextP2 }));
+                                  setSaveSuccess(false);
+                                }}
+                                className={`px-2 py-0.5 rounded font-bold text-[10px] cursor-pointer ${
+                                  val === false
+                                    ? isSubRight
+                                      ? "bg-emerald-600 text-white"
+                                      : "bg-rose-600 text-white"
+                                    : "bg-background border border-border text-muted-foreground"
+                                }`}
+                              >
+                                S
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Interactive Details Part 3 (Short Answer) */}
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            <div className="text-xs font-bold text-foreground">
+              Phần III — Trả lời ngắn (0.5đ/câu — sửa trực tiếp chuỗi số nhận dạng):
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+              {Object.entries(result.part3Answers).map(([qNumStr, item]) => {
+                const qNum = Number(qNumStr);
+                return (
+                  <div
+                    key={qNum}
+                    className={`p-2.5 rounded-xl border text-xs space-y-1.5 ${
+                      item.isCorrect
+                        ? "border-emerald-500/50 bg-emerald-50/40 dark:bg-emerald-950/20"
+                        : "border-rose-500/50 bg-rose-50/40 dark:bg-rose-950/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[10px] font-bold">
+                      <span className="text-foreground">Câu {qNum}</span>
+                      <span className="text-muted-foreground">ĐA: {item.key}</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={item.studentAns}
+                      onChange={(e) => {
+                        const nextP3 = {
+                          ...result.part3Answers,
+                          [qNum]: { ...item, studentAns: e.target.value },
+                        };
+                        setResult(recomputeOmrSheet({ ...result, part3Answers: nextP3 }));
+                        setSaveSuccess(false);
+                      }}
+                      className="w-full px-2 py-1 rounded bg-background border border-border font-mono font-bold text-center text-xs text-foreground"
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -460,15 +754,16 @@ export default function TeacherOmrPage() {
               {saveSuccess ? (
                 <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
                   <CheckCircle2 className="w-4 h-4" />
-                  Đã ghi vào Sổ điểm!
+                  Đã ghi vào Sổ điểm ({result.studentName} — {result.totalScore}đ)!
                 </span>
               ) : (
                 <button
                   onClick={handleSaveToGradebook}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  disabled={isSaving}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Save className="w-4 h-4" />
-                  <span>Lưu vào Sổ điểm</span>
+                  <span>{isSaving ? "Đang lưu..." : "Xác nhận & Lưu vào Sổ điểm"}</span>
                 </button>
               )}
             </div>
