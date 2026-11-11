@@ -142,10 +142,24 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
   const q = exam.questions[currentIndex];
   const textSizeClass =
     fontSize === "xlarge"
-      ? "text-2xl sm:text-3xl leading-relaxed"
+      ? "text-[26pt] sm:text-[32pt] leading-relaxed"
       : fontSize === "large"
-      ? "text-xl sm:text-2xl leading-relaxed"
-      : "text-lg sm:text-xl leading-normal";
+      ? "text-[22pt] sm:text-[26pt] leading-relaxed"
+      : "text-[20pt] sm:text-[22pt] leading-relaxed";
+
+  const optionSizeClass =
+    fontSize === "xlarge"
+      ? "text-[22pt] sm:text-[26pt] leading-snug"
+      : fontSize === "large"
+      ? "text-[20pt] sm:text-[22pt] leading-snug"
+      : "text-[18pt] sm:text-[20pt] leading-snug";
+
+  const explanationSizeClass =
+    fontSize === "xlarge"
+      ? "text-[20pt] sm:text-[24pt] leading-relaxed"
+      : fontSize === "large"
+      ? "text-[18pt] sm:text-[20pt] leading-relaxed"
+      : "text-[16pt] sm:text-[18pt] leading-relaxed";
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between select-none">
@@ -203,24 +217,24 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
           <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-1 gap-1">
             <button
               onClick={() => setFontSize("normal")}
-              className={`px-2 py-1 rounded text-xs font-bold ${fontSize === "normal" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
-              title="Cỡ chữ vừa"
+              className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer ${fontSize === "normal" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+              title="Cỡ chữ 20pt"
             >
-              A
+              A (20pt)
             </button>
             <button
               onClick={() => setFontSize("large")}
-              className={`px-2 py-1 rounded text-xs font-bold ${fontSize === "large" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
-              title="Cỡ chữ lớn"
+              className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer ${fontSize === "large" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+              title="Cỡ chữ 24pt"
             >
-              A+
+              A+ (24pt)
             </button>
             <button
               onClick={() => setFontSize("xlarge")}
-              className={`px-2 py-1 rounded text-xs font-bold ${fontSize === "xlarge" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
-              title="Cỡ chữ rất lớn (máy chiếu xa)"
+              className={`px-2.5 py-1 rounded text-xs font-bold cursor-pointer ${fontSize === "xlarge" ? "bg-blue-600 text-white" : "text-slate-400 hover:text-white"}`}
+              title="Cỡ chữ 30pt (máy chiếu xa)"
             >
-              A++
+              A++ (30pt)
             </button>
           </div>
 
@@ -235,7 +249,7 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
       </header>
 
       {/* 2. STAGE: QUESTION DISPLAY */}
-      <main className="flex-1 max-w-5xl mx-auto w-full p-4 sm:p-8 flex flex-col justify-center space-y-6 overflow-y-auto">
+      <main className="flex-1 max-w-6xl mx-auto w-full p-4 sm:p-8 flex flex-col justify-center space-y-6 overflow-y-auto">
         {/* Question Header */}
         <div className="p-6 sm:p-10 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-6">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
@@ -305,19 +319,19 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
                       : bgColors[opt.id]
                   }`}
                 >
-                  <div className="flex items-center gap-3.5">
-                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                  <div className="flex items-center gap-4">
+                    <span className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-lg shrink-0 ${
                       showAnswer && isCorrect ? "bg-white text-emerald-800" : "bg-white/10 text-white"
                     }`}>
                       {opt.id}
                     </span>
-                    <span className="text-base sm:text-lg font-semibold text-slate-100">
+                    <span className={`font-semibold text-slate-100 ${optionSizeClass}`}>
                       <MathText content={opt.text} />
                     </span>
                   </div>
 
                   {showAnswer && isCorrect && (
-                    <CheckCircle2 className="w-6 h-6 text-white shrink-0" />
+                    <CheckCircle2 className="w-7 h-7 text-white shrink-0" />
                   )}
                 </div>
               );
@@ -327,19 +341,19 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
 
         {/* True / False Statements */}
         {q.type === "true_false" && (
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {q.subQuestions.map((sub) => (
               <div
                 key={sub.id}
-                className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm sm:text-base font-medium"
+                className={`p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-medium ${optionSizeClass}`}
               >
-                <div className="flex items-start gap-2.5 max-w-2xl">
+                <div className="flex items-start gap-3 max-w-4xl">
                   <span className="font-bold text-amber-400 font-mono uppercase">{sub.id})</span>
                   <span><MathText content={sub.text} /></span>
                 </div>
 
                 {showAnswer && (
-                  <span className={`px-4 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shrink-0 ${
+                  <span className={`px-4 py-1.5 rounded-xl font-black text-base uppercase tracking-wider shrink-0 ${
                     sub.isCorrect
                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                       : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
@@ -355,15 +369,15 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
         {/* Short Answer */}
         {q.type === "short_answer" && (
           <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 text-center space-y-3">
-            <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+            <div className="text-sm uppercase tracking-wider text-slate-400 font-semibold">
               Học sinh điền kết quả vào ô trả lời ngắn:
             </div>
             {showAnswer ? (
-              <div className="inline-block px-8 py-3 rounded-2xl bg-emerald-950/80 border-2 border-emerald-500 text-emerald-200 text-xl sm:text-2xl font-mono font-bold">
+              <div className={`inline-block px-8 py-4 rounded-2xl bg-emerald-950/80 border-2 border-emerald-500 text-emerald-200 font-mono font-bold ${textSizeClass}`}>
                 🎯 Đáp án đúng: {q.correctAnswers.join(" hoặc ")}
               </div>
             ) : (
-              <div className="text-slate-500 text-sm italic">
+              <div className="text-slate-400 text-base italic">
                 Bấm nút &ldquo;Hiện đáp án&rdquo; để hiển thị kết quả cho học sinh đối chiếu
               </div>
             )}
@@ -372,20 +386,20 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
 
         {/* Essay Prompt */}
         {q.type === "essay" && (
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 text-sm leading-relaxed">
-            <strong className="text-amber-400 uppercase text-xs block mb-1">Yêu cầu trình bày tự luận:</strong>
+          <div className={`p-6 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 ${explanationSizeClass}`}>
+            <strong className="text-amber-400 uppercase text-sm block mb-1">Yêu cầu trình bày tự luận:</strong>
             Học sinh trình bày các bước lập luận, chứng minh và tính toán chi tiết vào giấy bài làm.
           </div>
         )}
 
         {/* Detailed Explanation Accordion */}
         {showExplanation && q.explanation && (
-          <div className="p-5 sm:p-6 rounded-2xl bg-blue-950/60 border border-blue-800/80 text-blue-100 text-sm sm:text-base space-y-2 animate-in fade-in-50 duration-200">
-            <div className="flex items-center gap-2 font-bold text-blue-300 text-xs uppercase tracking-wider">
-              <Sparkles className="w-4 h-4" />
+          <div className={`p-6 sm:p-8 rounded-2xl bg-blue-950/60 border border-blue-800/80 text-blue-100 space-y-3 animate-in fade-in-50 duration-200 ${explanationSizeClass}`}>
+            <div className="flex items-center gap-2 font-bold text-blue-300 text-sm uppercase tracking-wider">
+              <Sparkles className="w-5 h-5" />
               <span>Hướng dẫn giải chi tiết:</span>
             </div>
-            <div className="leading-relaxed">
+            <div>
               <MathText content={q.explanation} />
             </div>
           </div>

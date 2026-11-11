@@ -682,7 +682,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
                         </div>
                       </div>
 
-                      <div className="text-base sm:text-xl font-bold leading-relaxed text-white pt-1">
+                      <div className="text-[20pt] sm:text-[24pt] font-bold leading-relaxed text-white pt-1">
                         <MathText content={currentQ.text} />
                       </div>
                     </div>
@@ -725,7 +725,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
                     : "Trả lời ngắn"}
                 </div>
 
-                <div className="text-lg sm:text-2xl font-bold leading-relaxed text-slate-100">
+                <div className="text-[20pt] sm:text-[24pt] font-bold leading-relaxed text-slate-100">
                   <MathText content={currentQ.text} />
                 </div>
 
@@ -763,11 +763,11 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
                         isReveal && isCorrect ? "ring-4 ring-white scale-102 font-bold" : ""
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm">
+                      <div className="flex items-center gap-3.5">
+                        <span className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-base shrink-0">
                           {opt.id}
                         </span>
-                        <span className="text-sm sm:text-base font-semibold">
+                        <span className="text-[18pt] sm:text-[20pt] font-semibold leading-snug">
                           <MathText content={opt.text} />
                         </span>
                       </div>
@@ -807,7 +807,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
 
             {/* Explanation */}
             {isReveal && room.explanation && (
-              <div className="p-4 rounded-2xl bg-blue-950/80 border border-blue-800 text-blue-200 text-xs sm:text-sm text-left">
+              <div className="p-5 rounded-2xl bg-blue-950/80 border border-blue-800 text-blue-100 text-[16pt] sm:text-[18pt] leading-relaxed text-left">
                 <strong>💡 Lời giải chi tiết:</strong>{" "}
                 <MathText content={room.explanation} />
               </div>

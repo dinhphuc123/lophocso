@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -12,12 +13,16 @@ import {
   Settings, 
   PlusCircle, 
   LogOut,
-  Presentation 
+  Presentation,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 
 interface TeacherSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
+  autoHide?: boolean;
+  onToggleAutoHide?: () => void;
 }
 
 interface NavItem {
@@ -28,8 +33,16 @@ interface NavItem {
   tag?: string;
 }
 
-export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps) {
+export function TeacherSidebar({
+  isOpen = false,
+  onClose,
+  autoHide = true,
+  onToggleAutoHide,
+}: TeacherSidebarProps) {
   const pathname = usePathname();
+  const [hovered, setHovered] = useState(false);
+
+  const isCollapsed = autoHide && !hovered && !isOpen;
 
   const mainNav: NavItem[] = [
     { name: "Tổng quan", href: "/teacher/dashboard", icon: LayoutDashboard },
@@ -52,46 +65,69 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
         />
       )}
 
-      <aside className={`
-        fixed top-0 bottom-0 left-0 z-50 w-64 bg-card border-r border-border flex flex-col transition-transform duration-200 ease-in-out lg:translate-x-0
-        ${isOpen ? "translate-x-0" : "-translate-x-full"}
-      `}>
+      <aside
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={`
+          fixed top-0 bottom-0 left-0 z-50 bg-card border-r border-border flex flex-col transition-all duration-200 ease-in-out lg:translate-x-0
+          ${isOpen ? "translate-x-0 w-64" : "-translate-x-full"}
+          ${isCollapsed ? "lg:w-16" : "lg:w-64 lg:shadow-xl"}
+        `}
+      >
         {/* Brand Header */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-border">
-          <Link href="/teacher/dashboard" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shadow-blue-500/20">
+        <div className={`h-16 flex items-center border-b border-border ${isCollapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+          <Link href="/teacher/dashboard" className="flex items-center gap-2.5 overflow-hidden" title="Lớp Học Số">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shadow-blue-500/20 shrink-0">
               L
             </div>
-            <div>
-              <div className="font-bold text-foreground text-base tracking-tight flex items-center gap-1.5">
-                Lớp Học Số
-                <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
-                  GV
-                </span>
+            {!isCollapsed && (
+              <div className="truncate">
+                <div className="font-bold text-foreground text-base tracking-tight flex items-center gap-1.5">
+                  <span>Lớp Học Số</span>
+                  <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400">
+                    GV
+                  </span>
+                </div>
+                <div className="text-[11px] text-muted-foreground font-medium">lophocso.edu.vn</div>
               </div>
-              <div className="text-[11px] text-muted-foreground font-medium">lophocso.edu.vn</div>
-            </div>
+            )}
           </Link>
+
+          {!isCollapsed && onToggleAutoHide && (
+            <button
+              type="button"
+              onClick={onToggleAutoHide}
+              className="hidden lg:flex p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
+              title={autoHide ? "Ghim cố định thanh menu" : "Bật tự động ẩn thanh menu"}
+            >
+              {autoHide ? <PanelLeftOpen className="w-4 h-4 text-blue-600" /> : <PanelLeftClose className="w-4 h-4" />}
+            </button>
+          )}
         </div>
 
         {/* Quick Action Button */}
-        <div className="p-3">
+        <div className="p-2.5">
           <Link 
             href="/teacher/exams/create"
             onClick={onClose}
-            className="w-full h-10 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+            title="Tạo đề thi mới"
+            className={`w-full h-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer ${
+              isCollapsed ? "px-0" : "px-3"
+            }`}
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Tạo đề thi mới</span>
+            <PlusCircle className="w-4 h-4 shrink-0" />
+            {!isCollapsed && <span className="truncate">Tạo đề thi mới</span>}
           </Link>
         </div>
 
         {/* Navigation list */}
-        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-6 text-xs">
+        <div className="flex-1 overflow-y-auto px-2.5 py-2 space-y-6 text-xs">
           <div>
-            <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-              Khu vực giáo viên
-            </div>
+            {!isCollapsed && (
+              <div className="px-2.5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 truncate">
+                Khu vực giáo viên
+              </div>
+            )}
             <nav className="space-y-1">
               {mainNav.map((item) => {
                 const isActive = pathname === item.href;
@@ -101,24 +137,26 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
+                    title={item.name}
                     className={`
-                      flex items-center justify-between px-3 py-2.5 rounded-lg font-medium transition-colors
+                      flex items-center rounded-lg font-medium transition-colors py-2.5
+                      ${isCollapsed ? "justify-center px-0" : "justify-between px-3"}
                       ${isActive 
                         ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold" 
                         : "text-foreground/80 hover:bg-muted hover:text-foreground"
                       }
                     `}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className={`w-4 h-4 ${isActive ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`} />
-                      <span>{item.name}</span>
+                    <div className="flex items-center gap-3 truncate">
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`} />
+                      {!isCollapsed && <span className="truncate">{item.name}</span>}
                     </div>
-                    {item.badge && (
+                    {!isCollapsed && item.badge && (
                       <span className="px-1.5 py-0.5 text-[10px] rounded-md bg-muted text-muted-foreground font-medium">
                         {item.badge}
                       </span>
                     )}
-                    {item.tag && (
+                    {!isCollapsed && item.tag && (
                       <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-sm bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                         {item.tag}
                       </span>
@@ -130,50 +168,60 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
           </div>
 
           <div>
-            <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
-              <span>Trò chơi trên lớp</span>
-              <Gamepad2 className="w-3.5 h-3.5" />
-            </div>
+            {!isCollapsed && (
+              <div className="px-2.5 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center justify-between">
+                <span>Trò chơi trên lớp</span>
+                <Gamepad2 className="w-3.5 h-3.5" />
+              </div>
+            )}
             <nav className="space-y-1">
               <Link
                 href="/teacher/games"
                 onClick={onClose}
+                title="Game lớp học"
                 className={`
-                  flex items-center justify-between px-3 py-2.5 rounded-lg font-medium transition-colors
+                  flex items-center rounded-lg font-medium transition-colors py-2.5
+                  ${isCollapsed ? "justify-center px-0" : "justify-between px-3"}
                   ${isGamesActive 
                     ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold" 
                     : "text-foreground/80 hover:bg-muted hover:text-foreground"
                   }
                 `}
               >
-                <div className="flex items-center gap-3">
-                  <Gamepad2 className={`w-4 h-4 ${isGamesActive ? "text-blue-600 dark:text-blue-400" : "text-amber-500"}`} />
-                  <span>Game lớp học</span>
+                <div className="flex items-center gap-3 truncate">
+                  <Gamepad2 className={`w-4 h-4 shrink-0 ${isGamesActive ? "text-blue-600 dark:text-blue-400" : "text-amber-500"}`} />
+                  {!isCollapsed && <span className="truncate">Game lớp học</span>}
                 </div>
-                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-sm bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                  MỚI
-                </span>
+                {!isCollapsed && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-sm bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                    MỚI
+                  </span>
+                )}
               </Link>
             </nav>
           </div>
         </div>
 
         {/* Footer info / settings */}
-        <div className="p-3 border-t border-border space-y-1">
+        <div className="p-2.5 border-t border-border space-y-1">
           <Link
             href="/teacher/settings"
             onClick={onClose}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+            title="Cài đặt tài khoản"
+            className={`flex items-center gap-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              isCollapsed ? "justify-center px-0" : "px-3"
+            } ${
               pathname === "/teacher/settings"
                 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 font-semibold"
                 : "text-foreground/80 hover:bg-muted transition-colors"
             }`}
           >
-            <Settings className="w-4 h-4 text-muted-foreground" />
-            <span>Cài đặt tài khoản</span>
+            <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
+            {!isCollapsed && <span className="truncate">Cài đặt tài khoản</span>}
           </Link>
           <button
             type="button"
+            title="Đăng xuất"
             onClick={async () => {
               try {
                 await fetch("/api/auth/logout", { method: "POST" });
@@ -182,10 +230,12 @@ export function TeacherSidebar({ isOpen = false, onClose }: TeacherSidebarProps)
                 window.location.href = "/login";
               }
             }}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left"
+            className={`w-full flex items-center gap-3 py-2 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer text-left ${
+              isCollapsed ? "justify-center px-0" : "px-3"
+            }`}
           >
-            <LogOut className="w-4 h-4 text-rose-600" />
-            <span>Đăng xuất</span>
+            <LogOut className="w-4 h-4 text-rose-600 shrink-0" />
+            {!isCollapsed && <span className="truncate">Đăng xuất</span>}
           </button>
         </div>
       </aside>
