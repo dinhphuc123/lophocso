@@ -18,12 +18,15 @@ import {
   Download,
   Award,
   BookOpen,
-  X
+  X,
+  QrCode,
+  Maximize2
 } from "lucide-react";
 import { RoomView, PlayerView } from "@/lib/game-store";
 import { getCyberGateStageMeta, CYBER_GATES_PACKS } from "@/lib/cyber-gates-presets";
 import { CyberScenarioSvg, CyberShieldTray, speakVietnameseText, stopVietnameseSpeech } from "@/components/games/CyberGatesView";
 import { MathText } from "@/components/MathText";
+import { QrCodeSvg } from "@/components/QrCodeSvg";
 import { playSfx, launchConfetti, setSoundMuted, playLobbyBgm, playCountdownBgm, stopBgm } from "@/lib/effects";
 import { getAvatarInfo } from "@/lib/avatars";
 
@@ -36,6 +39,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
   const [isMuted, setIsMuted] = useState(false);
   const [clueOpen, setClueOpen] = useState(false);
   const [isSpeakingTts, setIsSpeakingTts] = useState(false);
+  const [qrZoomOpen, setQrZoomOpen] = useState(false);
 
   // Bonus points & export modal states
   const [showBonusModal, setShowBonusModal] = useState(false);
@@ -265,6 +269,47 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
   const playersList: PlayerView[] = room.players || [];
   const currentQ = room.question;
   const answeredCount = playersList.filter((p) => p.answered).length;
+  const originUrl = typeof window !== "undefined" ? window.location.origin : "https://lophocso.edu.vn";
+  const joinUrl = `${originUrl}/play?pin=${room.pin}`;
+
+  const qrModalElement = qrZoomOpen ? (
+    <div
+      className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
+      onClick={() => setQrZoomOpen(false)}
+    >
+      <div
+        className="bg-slate-900 border-2 border-amber-400/80 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center space-y-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2 text-amber-400 font-black text-base uppercase tracking-wider">
+            <QrCode className="w-5 h-5" />
+            <span>Quét Mã QR Để Vào Phòng Ngay</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setQrZoomOpen(false)}
+            className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex justify-center">
+          <div className="p-4 bg-white rounded-3xl shadow-2xl border-4 border-amber-400">
+            <QrCodeSvg value={joinUrl} size={320} />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-xs uppercase tracking-widest text-slate-400">Hoặc nhập mã PIN tại {originUrl}/play</div>
+          <div className="text-5xl sm:text-6xl font-black font-mono tracking-widest text-amber-400">
+            {room.pin}
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   // ==========================================
   // VIEW 1: LOBBY
@@ -350,21 +395,53 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
           </div>
         </div>
 
-        {/* Center: PIN Callout */}
-        <div className="my-auto py-8 text-center space-y-6">
-          <div className="space-y-2">
-            <p className="text-sm uppercase tracking-widest text-slate-400 font-semibold">
-              Học sinh dùng điện thoại hoặc máy tính truy cập:
-            </p>
-            <div className="inline-block px-6 py-2 rounded-2xl bg-slate-900 border border-slate-700 text-amber-300 font-mono text-xl sm:text-2xl font-bold tracking-wider">
-              {typeof window !== "undefined" ? window.location.origin : ""}/play
-            </div>
-          </div>
+        {/* Center: PIN & QR Code Callout */}
+        <div className="my-auto py-6 text-center space-y-6">
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 items-center bg-slate-900/70 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
+            {/* Left: Link & Huge PIN */}
+            <div className="md:col-span-7 space-y-5 text-center md:text-left">
+              <div className="space-y-2">
+                <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-400 font-semibold">
+                  Cách 1 · Truy cập đường dẫn trên điện thoại:
+                </p>
+                <div className="inline-block px-5 py-2 rounded-2xl bg-slate-950 border border-slate-700 text-amber-300 font-mono text-lg sm:text-2xl font-bold tracking-wider">
+                  {originUrl}/play
+                </div>
+              </div>
 
-          <div className="space-y-1">
-            <div className="text-xs uppercase tracking-widest text-slate-400">Và nhập mã PIN:</div>
-            <div className="text-6xl sm:text-8xl font-black tracking-widest font-mono text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 drop-shadow-md select-all">
-              {room.pin}
+              <div className="space-y-1">
+                <div className="text-xs uppercase tracking-widest text-slate-400 font-semibold">
+                  Và nhập mã PIN phòng thi:
+                </div>
+                <div className="text-6xl sm:text-8xl font-black tracking-widest font-mono text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 drop-shadow-md select-all leading-none">
+                  {room.pin}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Instant QR Scan Card */}
+            <div className="md:col-span-5 flex flex-col items-center justify-center md:border-l border-slate-800 md:pl-6 space-y-2.5">
+              <div className="text-xs uppercase tracking-wider font-extrabold text-emerald-400 flex items-center gap-1.5">
+                <QrCode className="w-4 h-4" />
+                <span>Cách 2 · Quét QR Vào Thẳng Phòng</span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setQrZoomOpen(true)}
+                className="group relative p-3 bg-white rounded-2xl shadow-xl border-4 border-amber-400/80 hover:border-amber-300 hover:scale-103 transition-all cursor-pointer"
+                title="Bấm để phóng to Mã QR toàn màn hình cho học sinh cuối lớp"
+              >
+                <QrCodeSvg value={joinUrl} size={188} />
+                <span className="mt-1.5 px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-[11px] font-bold flex items-center justify-center gap-1 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                  <Maximize2 className="w-3 h-3" />
+                  <span>Phóng to QR</span>
+                </span>
+              </button>
+
+              <p className="text-[11px] text-slate-400">
+                Mở Camera hoặc Zalo quét mã — tự điền sẵn PIN
+              </p>
             </div>
           </div>
 
@@ -457,6 +534,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
             <span>Bắt đầu trận đấu ({playersList.length} HS)</span>
           </button>
         </div>
+        {qrModalElement}
       </div>
     );
   }
@@ -823,6 +901,15 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
             <span>
               PIN: <strong className="text-amber-400 font-mono text-sm">{room.pin}</strong>
             </span>
+            <button
+              type="button"
+              onClick={() => setQrZoomOpen(true)}
+              className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 font-semibold flex items-center gap-1.5 transition cursor-pointer"
+              title="Hiện Mã QR cho học sinh vào muộn quét"
+            >
+              <QrCode className="w-3.5 h-3.5 text-amber-400" />
+              <span>Mã QR</span>
+            </button>
             <Link
               href={`/teacher/games/scan/${pin}`}
               target="_blank"
@@ -857,6 +944,7 @@ export default function GameHostPage({ params }: { params: Promise<{ pin: string
             )}
           </div>
         </div>
+        {qrModalElement}
       </div>
     );
   }
