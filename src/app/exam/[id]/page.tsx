@@ -191,8 +191,11 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
         return;
       }
       setStartedAt(data.startedAt);
-      const elapsed = Math.floor((data.serverNow - new Date(data.startedAt).getTime()) / 1000);
-      const remain = Math.max(0, data.durationSeconds - elapsed);
+      const serverMs = typeof data.serverNow === "number" ? data.serverNow : Date.parse(data.serverNow) || Date.now();
+      const startMs = Date.parse(data.startedAt) || serverMs;
+      const elapsed = Math.max(0, Math.floor((serverMs - startMs) / 1000));
+      const totalDurationSec = Number(data.durationSeconds) || (exam?.durationMinutes || 45) * 60;
+      const remain = Math.max(0, totalDurationSec - elapsed);
       setTimeLeft(remain);
       setHasStarted(true);
     } catch {

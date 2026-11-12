@@ -26,6 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     success: true,
     startedAt: res.attempt.startedAt,
     resumed: res.resumed,
+    durationSeconds: (exam.durationMinutes || 45) * 60,
     serverNow: new Date().toISOString(),
   });
 }

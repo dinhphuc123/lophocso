@@ -18,7 +18,13 @@ export function matchShort(user: unknown, accepted: string[]): boolean {
 type Detail = StudentSubmission["details"][number];
 
 function gradeQuestion(q: Exam["questions"][number], userAns: unknown): Detail {
-  const maxPoints = q.points || (q.type === "true_false" ? 1.0 : 0.25);
+  const defaultPts =
+    q.type === "true_false" || q.type === "essay"
+      ? 1.0
+      : q.type === "short_answer"
+      ? 0.5
+      : 0.25;
+  const maxPoints = q.points || defaultPts;
   const base = { questionId: q.id, maxPoints, explanation: q.explanation };
 
   if (q.type === "multiple_choice") {

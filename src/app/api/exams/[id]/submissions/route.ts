@@ -10,14 +10,56 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (denied) return denied;
   try {
     const { id } = await params;
-    const exam = getExamById(id);
+    const exam = await getExamWithFallback(id);
     if (!exam) {
       return NextResponse.json({ success: false, error: "Đề thi không tồn tại" }, { status: 404 });
     }
+
+    let submissions = getSubmissions(id);
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("submissions")
+          .select("*")
+          .eq("exam_id", id)
+          .order("submitted_at", { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const localMap = new Map(submissions.map((s) => [s.id, s]));
+          for (const row of data) {
+            const subId = String(row.id);
+            if (!localMap.has(subId)) {
+              const details = Array.isArray(row.details) ? row.details : [];
+              const mapped = {
+                id: subId,
+                examId: String(row.exam_id || id),
+                studentName: String(row.student_name || "Học sinh"),
+                studentClass: String(row.class_name || "Tự do"),
+                startedAt: String(row.started_at || row.submitted_at || new Date().toISOString()),
+                submittedAt: String(row.submitted_at || new Date().toISOString()),
+                score: Number(row.score) || 0,
+                totalScore: Number(row.total_score) || 10,
+                correctCount: details.filter((d: { isCorrect?: boolean }) => d?.isCorrect).length,
+                totalQuestions: exam.questions.length,
+                answers: (row.answers && typeof row.answers === "object" ? row.answers : {}) as Record<string, unknown>,
+                details,
+              };
+              saveSubmission(mapped);
+              localMap.set(subId, mapped);
+            }
+          }
+          submissions = Array.from(localMap.values());
+        }
+      } catch (err) {
+        console.warn("Supabase fetch submissions fallback error:", err);
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
       exam, 
-      submissions: getSubmissions(id),
+      submissions,
       activeAttempts: getActiveAttempts(id)
     });
   } catch (err: unknown) {

@@ -38,14 +38,22 @@ export function shuffleExam(exam: Exam, code: string = "101"): Exam {
 
   const shuffledMc = shuffleArray(mc, rand).map((q) => {
     if (q.type !== "multiple_choice") return q;
-    const shuffledOpts = shuffleArray(q.options, rand);
-    const labels = ["A", "B", "C", "D"] as const;
-    const newOptions: QuestionOption[] = shuffledOpts.map((opt, i) => ({
-      id: labels[i] || "A",
-      text: opt.text,
+    const taggedOpts = q.options.map((opt) => ({
+      ...opt,
+      wasCorrect: opt.id === q.correctAnswer,
     }));
-    const originalCorrectText = q.options.find((o) => o.id === q.correctAnswer)?.text;
-    const newCorrect = newOptions.find((o) => o.text === originalCorrectText)?.id || "A";
+    const shuffledOpts = shuffleArray(taggedOpts, rand);
+    const labels = ["A", "B", "C", "D"] as const;
+    let newCorrect: "A" | "B" | "C" | "D" = "A";
+    const newOptions: QuestionOption[] = shuffledOpts.map((opt, i) => {
+      const id = labels[i] || "A";
+      if (opt.wasCorrect) newCorrect = id;
+      return {
+        id,
+        text: opt.text,
+        ...(opt.imageUrl ? { imageUrl: opt.imageUrl } : {}),
+      };
+    });
 
     return {
       ...q,

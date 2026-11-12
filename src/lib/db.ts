@@ -121,9 +121,15 @@ export function deleteExam(id: string): boolean {
   db.attempts = db.attempts.filter((a) => a.examId !== id);
   writeDb(db);
 
-  const stillUsed = new Set(db.exams.flatMap((e) => e.questions.map((q) => q.imageUrl)));
-  for (const q of gone.questions) {
-    const url = q.imageUrl;
+  const collectUrls = (e: Exam) =>
+    e.questions.flatMap((q) => [
+      ...(q.imageUrl ? [q.imageUrl] : []),
+      ...(q.imageUrls || []),
+      ...(q.type === "multiple_choice" ? q.options.map((o) => o.imageUrl).filter(Boolean) as string[] : []),
+    ]);
+
+  const stillUsed = new Set(db.exams.flatMap(collectUrls));
+  for (const url of collectUrls(gone)) {
     if (!url || stillUsed.has(url) || !/^\/uploads\/[\w.-]+$/.test(url)) continue;
     fs.rmSync(path.join(process.cwd(), "public", url), { force: true });
   }

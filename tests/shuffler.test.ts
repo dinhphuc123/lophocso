@@ -86,3 +86,36 @@ test("shuffler: shuffleExam re-orders deterministically and remaps correctAnswer
   assert.equal(v102.questions[2].type, "true_false");
   assert.equal(v102.questions[3].type, "short_answer");
 });
+
+test("shuffler: preserves option imageUrl and tracks correctAnswer even when option texts are empty (image-only options)", () => {
+  const imgExam: Exam = {
+    id: "img-exam",
+    title: "Đề đồ thị",
+    subject: "Toán",
+    targetClass: "12A1",
+    durationMinutes: 45,
+    status: "open",
+    createdAt: new Date().toISOString(),
+    questions: [
+      {
+        id: "q_img",
+        type: "multiple_choice",
+        text: "Đồ thị nào dưới đây là của hàm số bậc ba?",
+        options: [
+          { id: "A", text: "", imageUrl: "data:image/png;base64,imgA" },
+          { id: "B", text: "", imageUrl: "data:image/png;base64,imgB" },
+          { id: "C", text: "", imageUrl: "data:image/png;base64,imgC" },
+          { id: "D", text: "", imageUrl: "data:image/png;base64,imgD" },
+        ],
+        correctAnswer: "C",
+      },
+    ],
+  };
+
+  const shuffled = shuffleExam(imgExam, "102");
+  const q = shuffled.questions[0];
+  assert.equal(q.type, "multiple_choice");
+  const winner = q.options.find((o) => o.id === q.correctAnswer);
+  assert.ok(winner);
+  assert.equal(winner.imageUrl, "data:image/png;base64,imgC");
+});

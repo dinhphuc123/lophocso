@@ -3,6 +3,7 @@ export type QuestionType = "multiple_choice" | "true_false" | "short_answer" | "
 export interface QuestionOption {
   id: "A" | "B" | "C" | "D";
   text: string;
+  imageUrl?: string;
 }
 
 export interface MultipleChoiceQuestion {

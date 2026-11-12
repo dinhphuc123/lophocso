@@ -18,27 +18,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ success: false, error: "Đề thi không tồn tại" }, { status: 404 });
     }
 
-    const { studentName, studentClass, answers, code } = await req.json();
+    const { studentName, studentClass, answers, code, startedAt: clientStartedAt } = await req.json();
     const name = typeof studentName === "string" ? studentName.trim() : "";
     if (!name) {
       return NextResponse.json({ success: false, error: "Vui lòng nhập họ và tên học sinh" }, { status: 400 });
     }
+    const cls = typeof studentClass === "string" ? studentClass.trim() : "";
 
-    // the attempt created by /start is the only source of truth for start time and one-submission-only
-    const attempt = getAttempt(id, name, typeof studentClass === "string" ? studentClass : "");
-    if (!attempt) {
-      return NextResponse.json({ success: false, error: "Chưa bắt đầu bài làm. Hãy tải lại trang và bấm Bắt đầu." }, { status: 403 });
-    }
-    if (attempt.submitted) {
+    // Check if student already submitted on local disk or Supabase
+    let attempt = getAttempt(id, name, cls);
+    if (attempt?.submitted) {
       return NextResponse.json({ success: false, error: "Em đã nộp bài này rồi" }, { status: 409 });
     }
-    if (Date.now() - Date.parse(attempt.startedAt) > exam.durationMinutes * 60_000 + GRACE_MS) {
+
+    // On serverless (Vercel), /start and /submit may hit different lambda instances.
+    // Reconstruct attempt safely if local /tmp was cold-started.
+    const validClientStart =
+      typeof clientStartedAt === "string" && Number.isFinite(Date.parse(clientStartedAt))
+        ? clientStartedAt
+        : new Date().toISOString();
+    const effectiveStartedAt = attempt?.startedAt || validClientStart;
+
+    if (Date.now() - Date.parse(effectiveStartedAt) > exam.durationMinutes * 60_000 + GRACE_MS) {
       return NextResponse.json({ success: false, error: "Đã hết thời gian làm bài" }, { status: 403 });
     }
 
     const clean = answers && typeof answers === "object" && !Array.isArray(answers) ? answers : {};
     const targetExam = typeof code === "string" && code ? shuffleExam(exam, code) : exam;
-    const submission = gradeSubmission(targetExam, attempt.studentName, attempt.studentClass || "Tự do", clean, attempt.startedAt);
+    const submission = gradeSubmission(targetExam, attempt?.studentName || name, attempt?.studentClass || cls || "Tự do", clean, effectiveStartedAt);
     saveSubmission(submission);
 
     const supabase = getSupabase();

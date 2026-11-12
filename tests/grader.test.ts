@@ -69,3 +69,27 @@ test("public exam never leaks the answer key or solutions", () => {
   }
   assert.ok(json.includes('"options"'));
 });
+
+test("default points per question type match BGD 2025 structure when points field is omitted", () => {
+  const noPointsExam: Exam = {
+    id: "e2",
+    title: "t2",
+    subject: "Toán",
+    targetClass: "12A",
+    durationMinutes: 45,
+    status: "open",
+    createdAt: "2026-01-01",
+    questions: [
+      { id: "q1", type: "multiple_choice", text: "mc", options: [{ id: "A", text: "1" }, { id: "B", text: "2" }, { id: "C", text: "3" }, { id: "D", text: "4" }], correctAnswer: "A" },
+      { id: "q2", type: "true_false", text: "tf", subQuestions: [{ id: "a", text: "a", isCorrect: true }, { id: "b", text: "b", isCorrect: false }, { id: "c", text: "c", isCorrect: true }, { id: "d", text: "d", isCorrect: false }] },
+      { id: "q3", type: "short_answer", text: "sa", correctAnswers: ["10"] },
+      { id: "q4", type: "essay", text: "es" },
+    ],
+  };
+  const sub = gradeSubmission(noPointsExam, "HS", "12A", { q1: "A", q3: "10" }, "2026-01-01");
+  assert.equal(sub.details[0].maxPoints, 0.25);
+  assert.equal(sub.details[1].maxPoints, 1.0);
+  assert.equal(sub.details[2].maxPoints, 0.5);
+  assert.equal(sub.details[3].maxPoints, 1.0);
+  assert.equal(sub.details[2].earnedPoints, 0.5);
+});
