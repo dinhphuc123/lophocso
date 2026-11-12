@@ -768,17 +768,25 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
                 )}
 
                 {/* Explanation */}
-                <div className="space-y-1 pt-1">
+                <div className="space-y-1.5 pt-1">
                   <label className="text-[11px] font-semibold text-muted-foreground">
-                    Hướng dẫn giải / Lời giải chi tiết (tùy chọn)
+                    Hướng dẫn giải / Lời giải chi tiết (hỗ trợ $công thức$ LaTeX &amp; bảng)
                   </label>
                   <textarea
-                    rows={1}
+                    rows={2}
                     value={q.explanation || ""}
                     onChange={(e) => updateQuestionExplanation(idx, e.target.value)}
-                    className="w-full p-2 rounded-xl border border-border/80 bg-background text-xs font-normal focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full p-2 rounded-xl border border-border/80 bg-background text-xs font-normal focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
                     placeholder="Nhập lời giải hoặc ghi chú..."
                   />
+                  {showMathPreview && q.explanation && (
+                    <div className="p-2.5 rounded-xl bg-blue-50/40 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 text-xs">
+                      <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 block mb-1">
+                        Xem trước lời giải [HDG]:
+                      </span>
+                      <MathText content={q.explanation} />
+                    </div>
+                  )}
                 </div>
               </div>
             );

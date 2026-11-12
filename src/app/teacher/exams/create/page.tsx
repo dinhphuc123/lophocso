@@ -13,10 +13,13 @@ import {
   Image as ImageIcon,
   HelpCircle,
   FileUp,
-  Tag
+  Tag,
+  Pencil,
+  Check,
+  Table as TableIcon
 } from "lucide-react";
 import { parseExamText } from "@/lib/parser";
-import { Question } from "@/lib/types";
+import { Question, MultipleChoiceQuestion, TrueFalseQuestion, ShortAnswerQuestion } from "@/lib/types";
 import { MathText } from "@/components/MathText";
 import { SqlFixModal } from "@/components/SqlFixModal";
 import { distributeExamPoints, auditExamQuestions } from "@/lib/item-analysis";
@@ -49,30 +52,38 @@ export default function CreateExamPage() {
   
   // File upload state
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadedInfo, setUploadedInfo] = useState<{ fileName: string; imageCount: number; questionCount: number } | null>(null);
+  const [uploadedInfo, setUploadedInfo] = useState<{
+    fileName: string;
+    imageCount: number;
+    tableCount: number;
+    questionCount: number;
+  } | null>(null);
 
   // Paste raw text state
   const [rawText, setRawText] = useState(`Phần 1. Trắc nghiệm nhiều lựa chọn
-Câu 1. [NB] Cho hàm số y=f(x) có bảng biến thiên như hình vẽ.
-Tiệm cận ngang của đồ thị hàm số là:
-A. x=-1/2.
-B. y=-1.
-C. y=-1/2.
-D. x=-1.
+Câu 1. [NB] Thời gian tập thể dục mỗi ngày (đơn vị: phút) của 35 người cao tuổi tại một khu phố được thống kê trong bảng tần số ghép nhóm sau:
+| Thời gian (phút) | $[0;15)$ | $[15;30)$ | $[30;45)$ | $[45;60)$ | $[60;75)$ |
+| --- | --- | --- | --- | --- | --- |
+| Số người | $4$ | $9$ | $12$ | $7$ | $3$ |
+Khoảng biến thiên của mẫu số liệu ghép nhóm trên bằng:
+A. $60$.
+<u>B</u>. $75$.
+C. $15$.
+D. $45$.
 [HDG]
-Tiệm cận ngang của đồ thị hàm số là đường thẳng y=-1.
+Đầu mút trái của nhóm đầu tiên $[0;15)$ là $a_1=0$ và đầu mút phải của nhóm cuối cùng $[60;75)$ là $a_6=75$. Suy ra khoảng biến thiên là $R=75-0=75$ (phút). Chọn đáp án B.
 
 Phần 2. Trắc nghiệm Đúng/Sai
-Câu 2. [TF] Cho hàm số f(x)=2cos(x)+x.
-a) [NB]#f(0)=2; f(π/2)=π/2.
-b) [NB]#Đạo hàm của hàm số đã cho là f'(x)=2sin(x)+1.
-c) [TH]#Nghiệm của phương trình f'(x)=0 trên đoạn [0; π/2] là π/6.
-d) [TH]#Giá trị lớn nhất của f(x) trên đoạn [0; π/2] là √3+π/6.
+Câu 2. [TF] Cho hàm số $f(x)=2\\cos(x)+x$.
+<u>a)</u> [NB]#$f(0)=2; f(\\pi/2)=\\pi/2$.
+b) [NB]#Đạo hàm của hàm số đã cho là $f'(x)=2\\sin(x)+1$.
+<u>c)</u> [TH]#Nghiệm của phương trình $f'(x)=0$ trên đoạn $[0; \\pi/2]$ là $\\pi/6$.
+d) [TH]#Giá trị lớn nhất của $f(x)$ trên đoạn $[0; \\pi/2]$ là $\\sqrt{3}+\\pi/6$.
 [HDG]
-Vị trí đặt lời giải chi tiết...
+- Ý a) Đúng, Ý b) Sai, Ý c) Đúng, Ý d) Sai.
 
 Phần 3. Trắc nghiệm trả lời ngắn
-Câu 3. [TH] Cho hình lăng trụ đứng ABC.A'B'C' có AB=5, BC=6, CA=7. Khoảng cách giữa hai đường thẳng AA' và BC bằng bao nhiêu? (làm tròn đến hàng phần mười).
+Câu 3. [TH] Cho hình lăng trụ đứng $ABC.A'B'C'$ có $AB=5, BC=6, CA=7$. Khoảng cách giữa hai đường thẳng $AA'$ và $BC$ bằng bao nhiêu? (làm tròn đến hàng phần mười).
 Trả lời: [[4,9||4.9]]
 [HDG]
 Lời giải chi tiết...
@@ -81,6 +92,7 @@ Phần 4. Tự luận
 Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và 4 quả bóng màu vàng, hộp II có 7 quả bóng màu đỏ và 3 quả bóng màu vàng. Lấy ngẫu nhiên một quả bóng từ hộp I bỏ vào hộp II. Sau đó lấy ngẫu nhiên một quả từ hộp II. Tính xác suất để quả bóng lấy ra từ hộp II là quả bóng chuyển từ hộp I sang, biết quả đó màu đỏ.`);
 
   const [parsedQuestions, setParsedQuestions] = useState<Question[]>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSqlModal, setShowSqlModal] = useState(false);
@@ -94,6 +106,7 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
     setIsUploading(true);
     setError(null);
     setUploadedInfo(null);
+    setEditingIndex(null);
 
     try {
       const formData = new FormData();
@@ -111,8 +124,9 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
 
       setUploadedInfo({
         fileName: file.name,
-        imageCount: data.imageCount,
-        questionCount: data.questionCount,
+        imageCount: data.imageCount ?? 0,
+        tableCount: data.tableCount ?? 0,
+        questionCount: data.questionCount ?? 0,
       });
 
       setTitle(file.name.replace(/\.docx$/i, ""));
@@ -128,12 +142,93 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
 
   const handleParseText = () => {
     setError(null);
+    setEditingIndex(null);
     const result = parseExamText(rawText);
     if (result.length === 0) {
       setError("Không tìm thấy câu hỏi hợp lệ. Vui lòng kiểm tra định dạng 'Câu 1:', 'A.', 'B.'...");
       return;
     }
     setParsedQuestions(result);
+  };
+
+  // Inline quick-edit helpers on Preview cards
+  const handleSelectMCCorrect = (qIdx: number, optId: "A" | "B" | "C" | "D") => {
+    setParsedQuestions((prev) => {
+      const next = [...prev];
+      const q = next[qIdx];
+      if (q && q.type === "multiple_choice") {
+        next[qIdx] = { ...q, correctAnswer: optId, answerUnknown: false };
+      }
+      return next;
+    });
+  };
+
+  const handleUpdateMCOptionText = (qIdx: number, optId: "A" | "B" | "C" | "D", text: string) => {
+    setParsedQuestions((prev) => {
+      const next = [...prev];
+      const q = next[qIdx] as MultipleChoiceQuestion;
+      if (q && q.type === "multiple_choice") {
+        next[qIdx] = {
+          ...q,
+          options: q.options.map((o) => (o.id === optId ? { ...o, text } : o)),
+        };
+      }
+      return next;
+    });
+  };
+
+  const handleToggleTFSub = (qIdx: number, subIdx: number) => {
+    setParsedQuestions((prev) => {
+      const next = [...prev];
+      const q = next[qIdx] as TrueFalseQuestion;
+      if (q && q.type === "true_false" && q.subQuestions[subIdx]) {
+        const subs = [...q.subQuestions];
+        subs[subIdx] = { ...subs[subIdx], isCorrect: !subs[subIdx].isCorrect };
+        next[qIdx] = { ...q, subQuestions: subs };
+      }
+      return next;
+    });
+  };
+
+  const handleUpdateTFSubText = (qIdx: number, subIdx: number, text: string) => {
+    setParsedQuestions((prev) => {
+      const next = [...prev];
+      const q = next[qIdx] as TrueFalseQuestion;
+      if (q && q.type === "true_false" && q.subQuestions[subIdx]) {
+        const subs = [...q.subQuestions];
+        subs[subIdx] = { ...subs[subIdx], text };
+        next[qIdx] = { ...q, subQuestions: subs };
+      }
+      return next;
+    });
+  };
+
+  const handleUpdateShortAnswers = (qIdx: number, raw: string) => {
+    setParsedQuestions((prev) => {
+      const next = [...prev];
+      const q = next[qIdx] as ShortAnswerQuestion;
+      if (q && q.type === "short_answer") {
+        const arr = raw
+          .split(/(?:\|\||[,;\n])/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        next[qIdx] = { ...q, correctAnswers: arr.length > 0 ? arr : [""] };
+      }
+      return next;
+    });
+  };
+
+  const handleUpdateField = (
+    qIdx: number,
+    fields: Partial<Pick<Question, "text" | "explanation" | "level" | "points">>
+  ) => {
+    setParsedQuestions((prev) => {
+      const next = [...prev];
+      if (next[qIdx]) {
+        next[qIdx] = { ...next[qIdx], ...fields } as Question;
+      }
+      return next;
+    });
   };
 
   const handlePublish = async () => {
@@ -190,7 +285,7 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
         </Link>
         <span className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5">
           <Tag className="w-3 h-3" />
-          Tự động tách câu & hình vẽ từ file .docx
+          Tự động tách câu, bảng số liệu & hình vẽ từ file .docx
         </span>
       </div>
 
@@ -200,7 +295,7 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
             Nhận dạng đề thi tự động từ file Word (.docx)
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Hỗ trợ nhận dạng tự động: hình vẽ đồ thị, gạch chân đáp án đúng, mức độ [NB]/[TH]/[VD], câu Đúng-Sai [TF], trả lời ngắn [[đáp án]] và tự luận [TL].
+            Hỗ trợ nhận dạng tự động: bảng tần số ghép nhóm, bảng biến thiên, hình vẽ đồ thị, công thức Toán (Word Equation / LaTeX), đáp án gạch chân / tô màu / từ [HDG], câu Đúng-Sai [TF], trả lời ngắn [[đáp án]] và tự luận [TL].
           </p>
         </div>
 
@@ -236,7 +331,7 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
             }`}
           >
             <FileUp className="w-4 h-4 text-blue-600" />
-            <span>Tải lên file Word (.docx có hình vẽ)</span>
+            <span>Tải lên file Word (.docx có bảng & hình vẽ)</span>
           </button>
           <button
             type="button"
@@ -284,10 +379,10 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
                 )}
               </div>
               <h3 className="text-sm font-bold text-foreground">
-                {isUploading ? "Đang phân tích đề và trích xuất hình vẽ..." : "Kéo thả hoặc bấm để chọn file Word (.docx)"}
+                {isUploading ? "Đang phân tích đề, bảng số liệu và trích xuất hình vẽ..." : "Kéo thả hoặc bấm để chọn file Word (.docx)"}
               </h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-                Hệ thống tự động bóc tách toàn bộ hình vẽ, nhận diện chữ gạch chân là đáp án đúng, phân loại mức độ [NB]/[TH]/[VD].
+                Hệ thống tự động bóc tách bảng tần số ghép nhóm, hình vẽ, nhận diện chữ gạch chân / tô màu hoặc từ [HDG] làm đáp án đúng, phân loại mức độ [NB]/[TH]/[VD].
               </p>
             </div>
 
@@ -299,8 +394,12 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
                     <span className="font-bold text-emerald-900 dark:text-emerald-200">
                       {uploadedInfo.fileName}
                     </span>
-                    <div className="text-emerald-700 dark:text-emerald-300 text-[11px] mt-0.5">
-                      Đã nhận diện: <strong>{uploadedInfo.questionCount} câu hỏi</strong> · Trích xuất: <strong>{uploadedInfo.imageCount} hình ảnh/đồ thị</strong>
+                    <div className="text-emerald-700 dark:text-emerald-300 text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2">
+                      <span>Đã nhận diện: <strong>{uploadedInfo.questionCount} câu hỏi</strong></span>
+                      <span>·</span>
+                      <span>Bảng số liệu: <strong>{uploadedInfo.tableCount} bảng</strong></span>
+                      <span>·</span>
+                      <span>Hình ảnh/đồ thị: <strong>{uploadedInfo.imageCount} hình</strong></span>
                     </div>
                   </div>
                 </div>
@@ -382,7 +481,7 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-blue-600" />
-                Nội dung đề thi theo mẫu OLM / CV 7991:
+                Nội dung đề thi theo mẫu OLM / CV 7991 (hỗ trợ bảng Markdown | ... |):
               </label>
               <button
                 type="button"
@@ -408,10 +507,15 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
         {parsedQuestions.length > 0 && (
           <div className="space-y-3 pt-4 border-t border-border">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Kết quả nhận dạng: {parsedQuestions.length} câu hỏi
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Kết quả nhận dạng: {parsedQuestions.length} câu hỏi</span>
+                </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Thầy/cô có thể bấm trực tiếp vào phương án A/B/C/D hoặc nút Đúng/Sai để đổi nhanh đáp án, hoặc bấm &ldquo;Sửa câu&rdquo; để chỉnh nội dung &amp; bảng số liệu.
+                </p>
+              </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[11px] font-semibold text-muted-foreground">Chia điểm nhanh:</span>
@@ -450,112 +554,237 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
               );
             })()}
 
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-              {parsedQuestions.map((q, idx) => (
-                <div key={q.id} className="p-4 rounded-xl border border-border/80 bg-muted/20 text-xs space-y-3">
-                  <div className="flex items-center justify-between font-bold text-foreground">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">Câu {idx + 1}</span>
-                      {q.level && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
-                          [{q.level}]
+            <div className="space-y-4 max-h-[640px] overflow-y-auto pr-1">
+              {parsedQuestions.map((q, idx) => {
+                const isEditing = editingIndex === idx;
+                const hasTable = q.text.includes("|");
+
+                return (
+                  <div key={q.id} className="p-4 rounded-xl border border-border/80 bg-muted/20 text-xs space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 font-bold text-foreground">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm">Câu {idx + 1}</span>
+                        <select
+                          value={q.level || "NB"}
+                          onChange={(e) => handleUpdateField(idx, { level: e.target.value })}
+                          className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800 cursor-pointer"
+                          title="Đổi mức độ nhận thức"
+                        >
+                          <option value="NB">[NB] Nhận biết</option>
+                          <option value="TH">[TH] Thông hiểu</option>
+                          <option value="VD">[VD] Vận dụng</option>
+                          <option value="VDC">[VDC] Vận dụng cao</option>
+                        </select>
+                        <span className="text-muted-foreground text-[11px] font-normal">
+                          ({q.type === "multiple_choice" ? "Trắc nghiệm nhiều lựa chọn" : q.type === "true_false" ? "Đúng/Sai [TF]" : q.type === "short_answer" ? "Trả lời ngắn" : "Tự luận [TL]"})
                         </span>
-                      )}
-                      <span className="text-muted-foreground text-[11px] font-normal">
-                        ({q.type === "multiple_choice" ? "Trắc nghiệm nhiều lựa chọn" : q.type === "true_false" ? "Đúng/Sai [TF]" : q.type === "short_answer" ? "Trả lời ngắn" : "Tự luận [TL]"})
-                      </span>
-                    </div>
-                    <span className="text-blue-600 font-semibold">{q.points} điểm</span>
-                  </div>
-
-                  {/* Question Text */}
-                  <div className="text-foreground text-sm font-medium whitespace-pre-wrap">
-                    <MathText content={q.text} />
-                  </div>
-
-                  {/* Question Image (from docx) */}
-                  {q.imageUrl && (
-                    <div className="p-2 rounded-xl bg-card border border-border/60 w-fit">
-                      <div className="text-[10px] font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
-                        <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Hình vẽ trích xuất từ file Word:</span>
+                        {hasTable && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            <TableIcon className="w-3 h-3" />
+                            <span>Có bảng số liệu</span>
+                          </span>
+                        )}
                       </div>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={q.imageUrl}
-                        alt={`Hình vẽ câu ${idx + 1}`}
-                        className="max-h-56 max-w-full rounded-lg object-contain bg-white"
-                      />
-                    </div>
-                  )}
 
-                  {/* Multiple Choice Preview */}
-                  {q.type === "multiple_choice" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                      {q.options.map((opt) => (
-                        <div
-                          key={opt.id}
-                          className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
-                            opt.id === q.correctAnswer
-                              ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-200"
-                              : "border-border bg-background text-foreground/80"
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0"
+                            max="10"
+                            value={q.points ?? 0.25}
+                            onChange={(e) => handleUpdateField(idx, { points: parseFloat(e.target.value) || 0 })}
+                            className="w-14 px-1.5 py-0.5 rounded border border-border bg-background text-blue-600 font-bold font-mono text-center text-xs"
+                          />
+                          <span className="text-blue-600 font-semibold text-[11px]">đ</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingIndex(isEditing ? null : idx)}
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+                            isEditing
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-card hover:bg-muted text-foreground border-border"
                           }`}
                         >
-                          <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs ${
-                            opt.id === q.correctAnswer ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"
-                          }`}>
-                            {opt.id}
-                          </span>
-                          <span><MathText content={opt.text} /></span>
-                          {opt.id === q.correctAnswer && (
-                            <span className="ml-auto text-[10px] font-bold text-emerald-600">✓ ĐÁP ÁN (GẠCH CHÂN)</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* True/False Preview */}
-                  {q.type === "true_false" && (
-                    <div className="space-y-1.5 pt-1">
-                      {q.subQuestions.map((sub) => (
-                        <div key={sub.id} className="flex items-center justify-between p-2.5 rounded-lg bg-background border border-border">
-                          <div className="flex items-center gap-2">
-                            <strong>{sub.id})</strong>
-                            {sub.level && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-muted text-muted-foreground">
-                                [{sub.level}]
-                              </span>
-                            )}
-                            <span><MathText content={sub.text} /></span>
-                          </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${sub.isCorrect ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                            {sub.isCorrect ? "Đúng" : "Sai"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Short Answer Preview */}
-                  {q.type === "short_answer" && (
-                    <div className="p-2.5 rounded-lg bg-background border border-border flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground">Đáp án đúng [[...]] :</span>
-                      <strong className="text-blue-600 font-mono">{q.correctAnswers.join(" || ")}</strong>
-                    </div>
-                  )}
-
-                  {/* Explanation [HDG] */}
-                  {q.explanation && (
-                    <div className="text-[11px] text-muted-foreground bg-blue-50/50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 p-2.5 rounded-lg flex items-start gap-1.5">
-                      <HelpCircle className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-foreground">[HDG]:</strong> {q.explanation}
+                          {isEditing ? <Check className="w-3 h-3" /> : <Pencil className="w-3 h-3" />}
+                          <span>{isEditing ? "Xong" : "Sửa câu"}</span>
+                        </button>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Inline Editor for Question Text & Table */}
+                    {isEditing ? (
+                      <div className="space-y-2 p-3 rounded-xl bg-card border border-blue-300 dark:border-blue-800">
+                        <label className="text-[11px] font-bold text-foreground block">
+                          Nội dung đề bài &amp; Bảng số liệu (hỗ trợ $LaTeX$ và bảng Markdown | cột 1 | cột 2 |):
+                        </label>
+                        <textarea
+                          rows={hasTable ? 5 : 3}
+                          value={q.text}
+                          onChange={(e) => handleUpdateField(idx, { text: e.target.value })}
+                          className="w-full p-2.5 rounded-lg border border-border bg-background font-mono text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div className="p-2.5 rounded-lg bg-muted/30 border border-border/60 space-y-1">
+                          <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+                            Xem trước hiển thị trực tiếp:
+                          </span>
+                          <div className="text-foreground text-sm font-medium whitespace-pre-wrap">
+                            <MathText content={q.text} />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Question Text Display */
+                      <div className="text-foreground text-sm font-medium whitespace-pre-wrap leading-relaxed">
+                        <MathText content={q.text} />
+                      </div>
+                    )}
+
+                    {/* Question Image (from docx) */}
+                    {q.imageUrl && (
+                      <div className="p-2 rounded-xl bg-card border border-border/60 w-fit">
+                        <div className="text-[10px] font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
+                          <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Hình vẽ trích xuất từ file Word:</span>
+                        </div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={q.imageUrl}
+                          alt={`Hình vẽ câu ${idx + 1}`}
+                          className="max-h-56 max-w-full rounded-lg object-contain bg-white"
+                        />
+                      </div>
+                    )}
+
+                    {/* Multiple Choice Preview & Interactive Answer Selector */}
+                    {q.type === "multiple_choice" && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        {q.options.map((opt) => {
+                          const isCorrect = opt.id === q.correctAnswer;
+                          return (
+                            <div
+                              key={opt.id}
+                              onClick={() => !isEditing && handleSelectMCCorrect(idx, opt.id)}
+                              className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 transition-colors ${
+                                !isEditing ? "cursor-pointer" : ""
+                              } ${
+                                isCorrect
+                                  ? "bg-emerald-50 border-emerald-400 text-emerald-900 font-bold dark:bg-emerald-950 dark:border-emerald-700 dark:text-emerald-200"
+                                  : "border-border bg-background hover:bg-muted/60 text-foreground/80"
+                              }`}
+                              title={!isEditing ? `Bấm để chọn ${opt.id} làm đáp án đúng` : undefined}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectMCCorrect(idx, opt.id);
+                                }}
+                                className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs shrink-0 cursor-pointer ${
+                                  isCorrect ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {opt.id}
+                              </button>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={opt.text}
+                                  onChange={(e) => handleUpdateMCOptionText(idx, opt.id, e.target.value)}
+                                  className="flex-1 px-2 py-1 rounded border border-border bg-background text-xs font-normal text-foreground"
+                                />
+                              ) : (
+                                <span className="flex-1"><MathText content={opt.text} /></span>
+                              )}
+                              {isCorrect && (
+                                <span className="ml-auto text-[10px] font-bold text-emerald-600 shrink-0">✓ ĐÁP ÁN</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* True/False Preview & Interactive Toggle */}
+                    {q.type === "true_false" && (
+                      <div className="space-y-1.5 pt-1">
+                        {q.subQuestions.map((sub, sIdx) => (
+                          <div key={sub.id} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-background border border-border">
+                            <div className="flex items-center gap-2 flex-1">
+                              <strong>{sub.id})</strong>
+                              {sub.level && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-muted text-muted-foreground">
+                                  [{sub.level}]
+                                </span>
+                              )}
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={sub.text}
+                                  onChange={(e) => handleUpdateTFSubText(idx, sIdx, e.target.value)}
+                                  className="flex-1 px-2 py-1 rounded border border-border bg-background text-xs"
+                                />
+                              ) : (
+                                <span><MathText content={sub.text} /></span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleTFSub(idx, sIdx)}
+                              className={`text-[10px] font-bold px-2.5 py-1 rounded cursor-pointer transition-colors shrink-0 ${
+                                sub.isCorrect
+                                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                                  : "bg-rose-600 text-white hover:bg-rose-700"
+                              }`}
+                              title="Bấm để đổi Đúng / Sai"
+                            >
+                              {sub.isCorrect ? "Đúng ✓" : "Sai ✕"}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Short Answer Preview & Editable Input */}
+                    {q.type === "short_answer" && (
+                      <div className="p-2.5 rounded-lg bg-background border border-border flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-muted-foreground font-semibold">Đáp án đúng [[...]] :</span>
+                        <input
+                          type="text"
+                          value={q.correctAnswers.join(" || ")}
+                          onChange={(e) => handleUpdateShortAnswers(idx, e.target.value)}
+                          placeholder="VD: 1,79 || 1.79"
+                          className="flex-1 min-w-[160px] px-2.5 py-1 rounded border border-border bg-muted/30 text-blue-600 font-bold font-mono text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+
+                    {/* Explanation [HDG] */}
+                    {(q.explanation || isEditing) && (
+                      <div className="text-[11px] text-muted-foreground bg-blue-50/50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 p-2.5 rounded-lg space-y-1.5">
+                        <div className="flex items-start gap-1.5">
+                          <HelpCircle className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                          <div className="flex-1 whitespace-pre-wrap leading-relaxed">
+                            <strong className="text-foreground">[HDG]:</strong>{" "}
+                            <MathText content={q.explanation || ""} />
+                          </div>
+                        </div>
+                        {isEditing && (
+                          <textarea
+                            rows={2}
+                            value={q.explanation || ""}
+                            onChange={(e) => handleUpdateField(idx, { explanation: e.target.value })}
+                            placeholder="Nhập hoặc chỉnh sửa lời giải chi tiết [HDG]..."
+                            className="w-full p-2 rounded border border-border bg-background font-mono text-xs text-foreground"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

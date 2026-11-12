@@ -60,3 +60,53 @@ test("parseDocxBuffer without uploadDir produces base64 data URIs for serverless
   assert.equal(res.imageCount, 6);
   assert.ok(res.questions.filter((q) => q.imageUrl).every((q) => q.imageUrl!.startsWith("data:image/")));
 });
+
+test("grouped frequency table exam (Bai 9 Toan 12): 24 questions (12 MC, 4 TF, 6 SA, 2 Essay) & 19 Markdown tables", async () => {
+  const buf = fs.readFileSync(path.join(import.meta.dirname, "fixtures", "de-thong-ke-bai9.docx"));
+  const res = await parseDocxBuffer(buf);
+
+  assert.equal(res.questions.length, 24);
+  assert.equal(res.tableCount, 19);
+
+  const mc = res.questions.filter((q) => q.type === "multiple_choice");
+  const tf = res.questions.filter((q) => q.type === "true_false");
+  const sa = res.questions.filter((q) => q.type === "short_answer");
+  const es = res.questions.filter((q) => q.type === "essay");
+
+  assert.equal(mc.length, 12);
+  assert.equal(tf.length, 4);
+  assert.equal(sa.length, 6);
+  assert.equal(es.length, 2);
+
+  // Verify all 12 MC questions have 4 options and known answers matching the official key
+  const expectedMcAnswers = ["A", "C", "B", "D", "A", "D", "B", "C", "D", "B", "A", "C"];
+  assert.deepEqual(
+    mc.map((q) => q.correctAnswer),
+    expectedMcAnswers
+  );
+  assert.ok(mc.every((q) => q.options.length === 4 && !q.answerUnknown));
+
+  // Verify Câu 3 (index 2) has a Markdown pipe table and glued options A. 60.B. 75.C. 15.D. 45. properly split
+  assert.match(mc[2].text, /\| Thời gian \(phút\) \|/);
+  assert.equal(mc[2].options.length, 4);
+
+  // Verify all 4 TF questions have 4 subQuestions and exact True/False key
+  const expectedTfAnswers = [
+    [true, false, true, false],
+    [false, true, true, false],
+    [true, true, false, true],
+    [false, true, false, true],
+  ];
+  assert.deepEqual(
+    tf.map((q) => q.subQuestions.map((s) => s.isCorrect)),
+    expectedTfAnswers
+  );
+
+  // Verify Short Answer keys
+  assert.deepEqual(sa[0].correctAnswers, ["1,79", "1.79"]);
+  assert.deepEqual(sa[1].correctAnswers, ["16"]);
+
+  // Verify Essay Câu 8 does not contain the trailing PHỤ LỤC section
+  assert.ok(es[1].explanation && !/PHỤ LỤC/i.test(es[1].explanation));
+  assert.ok(!/PHẦN\s+(?:II|III|IV)/i.test(mc[11].explanation || ""));
+});

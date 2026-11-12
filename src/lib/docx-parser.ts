@@ -10,6 +10,7 @@ export interface DocxParseResult {
   rawText: string;
   questions: Question[];
   imageCount: number;
+  tableCount?: number;
 }
 
 export interface DocxParseOptions {
@@ -31,6 +32,29 @@ function sniffImageExt(b: Uint8Array): string | null {
 
 const decodeXml = (s: string) =>
   s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+
+/** Detect if a <w:rPr> block has an explicit highlight / red / blue answer color */
+function hasColorOrHighlight(rPrXml: string): boolean {
+  if (/<w:highlight(?:\s[^>]*)?\/?>/.test(rPrXml) && !/w:val="none"/.test(rPrXml)) {
+    return true;
+  }
+  const colorMatch = rPrXml.match(/<w:color\s[^>]*w:val="([^"]+)"/i);
+  if (colorMatch) {
+    const val = colorMatch[1].toUpperCase();
+    // Ignore auto, black, and dark gray shades
+    if (
+      val !== "AUTO" &&
+      val !== "000000" &&
+      val !== "111111" &&
+      val !== "222222" &&
+      val !== "333333" &&
+      val !== "444444"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 export async function parseDocxBuffer(
   buffer: Buffer | ArrayBuffer | Uint8Array,
@@ -87,7 +111,6 @@ export async function parseDocxBuffer(
     return (imageUrls[rId] = `data:${mime};base64,${base64}`);
   }
 
-  // 3. paragraph by paragraph, in document order
   const docXml = await docFile.async("text");
 
   async function parseParagraph(pXml: string): Promise<{ text: string; imgUrl?: string }> {
@@ -109,20 +132,112 @@ export async function parseDocxBuffer(
       const blip = content.match(/r:embed="([^"]+)"/);
       if (blip) imgUrl = (await imageFor(blip[1])) ?? imgUrl;
 
-      // underline marks the correct answer; w:u val="none" is an explicit "no underline"
-      const underlined = /<w:u(?:\s[^>]*)?\/?>/.test(content) && !/<w:u\s[^>]*w:val="none"/.test(content);
+      const rPr = content.match(/<w:rPr(?:\s[^>]*)?>[\s\S]*?<\/w:rPr>/)?.[0] ?? "";
       let runText = "";
       for (const part of content.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>|<w:tab\/>|<w:br\/>/g)) {
         runText += part[0].startsWith("<w:tab") ? "\t" : part[0].startsWith("<w:br") ? "\n" : part[1];
       }
       runText = decodeXml(runText);
+      // underline marks the correct answer; w:u val="none" is an explicit "no underline"
+      // Also support highlight/colored option letters (A/B/C/D or a/b/c/d), ignoring colored tags like [NB] or [HDG]
+      const hasUnderline = /<w:u(?:\s[^>]*)?\/?>/.test(rPr) && !/<w:u\s[^>]*w:val="none"/.test(rPr);
+      const isOptionMarkerRun = /^\s*[A-Da-d]\s*[.:)]?\s*$/.test(runText);
+      const underlined = hasUnderline || (isOptionMarkerRun && hasColorOrHighlight(rPr));
       if (runText) pText += underlined ? `<u>${runText}</u>` : runText;
     }
     return { text: pText.trim(), imgUrl };
   }
 
+  // 3. Process top-level blocks in document order (<w:tbl> and <w:p>)
+  // Smart Table Layout classifier:
+  // - Option layout table (2x2 or 1x4 where cells start with A., B., C., D.) -> flatten to paragraphs
+  // - Side-by-side stem + figure table (1 row, 2 cols where one cell has an image or question stem) -> flatten
+  // - Data / statistical / variation table (e.g. grouped frequency table) -> emit Markdown pipe table
   const lines: Array<{ text: string; imgUrl?: string }> = [];
-  for (const pm of docXml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)) lines.push(await parseParagraph(pm[0]));
+  let tableCount = 0;
+
+  const blockRegex = /<w:tbl(?:\s[^>]*)?>[\s\S]*?<\/w:tbl>|<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g;
+  for (const bm of docXml.matchAll(blockRegex)) {
+    const blockXml = bm[0];
+    if (blockXml.startsWith("<w:p")) {
+      lines.push(await parseParagraph(blockXml));
+      continue;
+    }
+
+    // Parse <w:tbl>
+    const rows: Array<Array<{ text: string; imgUrl?: string }>> = [];
+    for (const trMatch of blockXml.matchAll(/<w:tr(?:\s[^>]*)?>[\s\S]*?<\/w:tr>/g)) {
+      const rowCells: Array<{ text: string; imgUrl?: string }> = [];
+      for (const tcMatch of trMatch[0].matchAll(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g)) {
+        const tcXml = tcMatch[0];
+        const cellTexts: string[] = [];
+        let cellImg: string | undefined;
+        for (const pMatch of tcXml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)) {
+          const parsedP = await parseParagraph(pMatch[0]);
+          if (parsedP.text) cellTexts.push(parsedP.text);
+          if (parsedP.imgUrl) cellImg = parsedP.imgUrl;
+        }
+        // Check horizontal merge (gridSpan) so multi-column headers stay aligned
+        const spanMatch = tcXml.match(/<w:gridSpan\s[^>]*w:val="(\d+)"/);
+        const span = spanMatch ? Math.min(parseInt(spanMatch[1], 10) || 1, 12) : 1;
+
+        rowCells.push({
+          text: cellTexts.join(" ").replace(/\r?\n/g, " ").trim(),
+          imgUrl: cellImg,
+        });
+        for (let s = 1; s < span; s++) {
+          rowCells.push({ text: "" });
+        }
+      }
+      if (rowCells.some((c) => c.text || c.imgUrl)) {
+        rows.push(rowCells);
+      }
+    }
+
+    if (rows.length === 0) continue;
+
+    const allCells = rows.flat();
+    const nonEmptyCells = allCells.filter((c) => c.text || c.imgUrl);
+
+    // Case A: Table contains an image (e.g. 2-column stem + figure layout)
+    const hasImage = allCells.some((c) => c.imgUrl);
+    // Case B: Option grid table (every non-empty cell starts with A. / B. / C. / D.)
+    const optionCellCount = nonEmptyCells.filter((c) =>
+      /^(?:<u>)?[A-D](?:<\/u>)?[\s.:)]+/i.test(c.text.trim())
+    ).length;
+    const isOptionGrid = nonEmptyCells.length >= 2 && optionCellCount === nonEmptyCells.length;
+    // Case C: Multi-question layout wrapper table (cells start with "Câu 1", "PHẦN I", etc.)
+    const isQuestionWrapper = nonEmptyCells.some((c) => /^(?:<u>)?(?:Câu|Bài)\s*\d+/i.test(c.text.trim()));
+
+    if (hasImage || isOptionGrid || isQuestionWrapper) {
+      for (const cell of allCells) {
+        if (cell.text || cell.imgUrl) {
+          lines.push(cell);
+        }
+      }
+      continue;
+    }
+
+    // Case D: Real data / frequency table -> emit Markdown pipe table
+    const colCount = Math.max(...rows.map((r) => r.length));
+    if (colCount === 0) continue;
+
+    tableCount++;
+    const mdRows: string[] = [];
+    rows.forEach((r, rIdx) => {
+      const padded = Array.from({ length: colCount }, (_, cIdx) => {
+        const rawCell = r[cIdx]?.text ?? "";
+        // Escape literal pipe characters outside math or replace with \mid if needed
+        return rawCell.replace(/\|/g, "&#124;").trim();
+      });
+      mdRows.push(`| ${padded.join(" | ")} |`);
+      if (rIdx === 0) {
+        mdRows.push(`| ${Array.from({ length: colCount }, () => "---").join(" | ")} |`);
+      }
+    });
+
+    lines.push({ text: mdRows.join("\n") });
+  }
 
   // 4. an image-only paragraph belongs to the line before it (the "Câu X." heading)
   const out: string[] = [];
@@ -144,5 +259,10 @@ export async function parseDocxBuffer(
     if (!used.has(`/uploads/${path.basename(file)}`)) fs.rmSync(file, { force: true });
   }
 
-  return { rawText, questions, imageCount: questions.filter((q) => q.imageUrl).length };
+  return {
+    rawText,
+    questions,
+    imageCount: questions.filter((q) => q.imageUrl).length,
+    tableCount,
+  };
 }

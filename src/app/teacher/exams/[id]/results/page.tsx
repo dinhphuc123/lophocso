@@ -603,7 +603,7 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                     </div>
 
                     <div className="text-foreground whitespace-pre-wrap">
-                      <strong>Đề bài:</strong> {q?.text}
+                      <strong>Đề bài:</strong> <MathText content={q?.text || ""} />
                     </div>
 
                     <div className="p-2.5 rounded-lg bg-background border border-border">

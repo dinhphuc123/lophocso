@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       success: true,
       fileName: file.name,
       imageCount: result.imageCount,
+      tableCount: result.tableCount ?? 0,
       questionCount: result.questions.length,
       questions: result.questions,
       rawText: result.rawText,
