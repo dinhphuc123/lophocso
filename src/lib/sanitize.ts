@@ -1,7 +1,14 @@
 import { Exam, PublicExam, PublicQuestion, Question } from "./types";
 
 export function toPublicQuestion(q: Question): PublicQuestion {
-  const base = { id: q.id, text: q.text, level: q.level, imageUrl: q.imageUrl, points: q.points };
+  const base = {
+    id: q.id,
+    text: q.text,
+    level: q.level,
+    imageUrl: q.imageUrl,
+    ...(q.imageUrls ? { imageUrls: q.imageUrls } : {}),
+    points: q.points,
+  };
   switch (q.type) {
     case "multiple_choice":
       return { ...base, type: q.type, options: q.options };

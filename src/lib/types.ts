@@ -16,6 +16,7 @@ export interface MultipleChoiceQuestion {
   explanation?: string;
   level?: "NB" | "TH" | "VD" | "VDC" | string;
   imageUrl?: string;
+  imageUrls?: string[];
   points?: number;
 }
 
@@ -34,6 +35,7 @@ export interface TrueFalseQuestion {
   explanation?: string;
   level?: "NB" | "TH" | "VD" | "VDC" | string;
   imageUrl?: string;
+  imageUrls?: string[];
   points?: number;
 }
 
@@ -45,6 +47,7 @@ export interface ShortAnswerQuestion {
   explanation?: string;
   level?: "NB" | "TH" | "VD" | "VDC" | string;
   imageUrl?: string;
+  imageUrls?: string[];
   points?: number;
 }
 
@@ -55,13 +58,14 @@ export interface EssayQuestion {
   explanation?: string;
   level?: "NB" | "TH" | "VD" | "VDC" | string;
   imageUrl?: string;
+  imageUrls?: string[];
   points?: number;
 }
 
 export type Question = MultipleChoiceQuestion | TrueFalseQuestion | ShortAnswerQuestion | EssayQuestion;
 
 // What a student / game player may see: never the answer key or the solution.
-type Common = "id" | "text" | "level" | "imageUrl" | "points";
+type Common = "id" | "text" | "level" | "imageUrl" | "imageUrls" | "points";
 export type PublicQuestion =
   | (Pick<MultipleChoiceQuestion, Common | "type" | "options">)
   | (Pick<TrueFalseQuestion, Common | "type"> & { subQuestions: Omit<TrueFalseSubQuestion, "isCorrect">[] })

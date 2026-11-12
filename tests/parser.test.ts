@@ -110,3 +110,23 @@ test("grouped frequency table exam (Bai 9 Toan 12): 24 questions (12 MC, 4 TF, 6
   assert.ok(es[1].explanation && !/PHỤ LỤC/i.test(es[1].explanation));
   assert.ok(!/PHẦN\s+(?:II|III|IV)/i.test(mc[11].explanation || ""));
 });
+
+test("multi-image support: preserves multiple stem figures, option figures, and [HDG] solution figures without losing any", () => {
+  const raw = [
+    "Câu 1. [TH] Cho đồ thị và bảng biến thiên sau: [HINH_ANH:/uploads/img_stem1.png] [HINH_ANH:/uploads/img_stem2.png]",
+    "Hình nào dưới đây là đồ thị đạo hàm?",
+    "<u>A</u>. Hình 1 [HINH_ANH:/uploads/img_optA.png]",
+    "B. Hình 2 [HINH_ANH:/uploads/img_optB.png]",
+    "C. Hình 3",
+    "D. Hình 4",
+    "[HDG] Ta vẽ thêm đường phụ [HINH_ANH:/uploads/img_hdg.png] suy ra đáp án A.",
+  ].join("\n");
+
+  const [q] = parseExamText(raw);
+  assert.ok(q.type === "multiple_choice");
+  assert.equal(q.imageUrl, "/uploads/img_stem1.png");
+  assert.deepEqual(q.imageUrls, ["/uploads/img_stem1.png", "/uploads/img_stem2.png"]);
+  assert.match(q.options[0].text, /\[HINH_ANH:\/uploads\/img_optA\.png\]/);
+  assert.match(q.options[1].text, /\[HINH_ANH:\/uploads\/img_optB\.png\]/);
+  assert.match(q.explanation || "", /\[HINH_ANH:\/uploads\/img_hdg\.png\]/);
+});

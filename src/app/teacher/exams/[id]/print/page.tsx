@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Printer, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { Exam } from "@/lib/types";
 import { MathText } from "@/components/MathText";
+import { QuestionFigures } from "@/components/QuestionFigures";
 import { shuffleExam } from "@/lib/shuffler";
 
 export default function ExamPrintPage({ params }: { params: Promise<{ id: string }> }) {
@@ -148,16 +149,12 @@ export default function ExamPrintPage({ params }: { params: Promise<{ id: string
               </div>
 
               {/* Hình ảnh (nếu có) */}
-              {q.imageUrl && (
-                <div className="my-2 flex justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={q.imageUrl}
-                    alt={`Hình vẽ câu ${idx + 1}`}
-                    className="max-h-52 max-w-sm object-contain border border-gray-200 rounded p-1"
-                  />
-                </div>
-              )}
+              <QuestionFigures
+                imageUrl={q.imageUrl}
+                imageUrls={q.imageUrls}
+                questionNumber={idx + 1}
+                variant="print"
+              />
 
               {/* Multiple Choice Options */}
               {q.type === "multiple_choice" && (

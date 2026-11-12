@@ -6,6 +6,7 @@ import { ArrowLeft, Copy, Users, ChevronRight, AlertCircle, Download, Check, Rot
 import { Exam, StudentSubmission, Attempt } from "@/lib/types";
 import { analyzeExamQuestions } from "@/lib/item-analysis";
 import { MathText } from "@/components/MathText";
+import { QuestionFigures } from "@/components/QuestionFigures";
 
 export default function ExamResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: examId } = use(params);
@@ -605,6 +606,11 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                     <div className="text-foreground whitespace-pre-wrap">
                       <strong>Đề bài:</strong> <MathText content={q?.text || ""} />
                     </div>
+                    <QuestionFigures
+                      imageUrl={q?.imageUrl}
+                      imageUrls={q?.imageUrls}
+                      questionNumber={i + 1}
+                    />
 
                     <div className="p-2.5 rounded-lg bg-background border border-border">
                       <span className="text-muted-foreground font-semibold">Bài làm của học sinh: </span>

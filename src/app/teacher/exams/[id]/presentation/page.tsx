@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Exam } from "@/lib/types";
 import { MathText } from "@/components/MathText";
+import { QuestionFigures } from "@/components/QuestionFigures";
 
 export default function ExamPresentationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: examId } = use(params);
@@ -84,6 +85,16 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
     }
   }, [currentIndex, totalQ]);
 
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
+  }, []);
+
   // Keyboard shortcuts: Arrow keys, Space to toggle answer, F to toggle fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -107,17 +118,7 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToPrev, goToNext]);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
-    }
-  };
+  }, [goToPrev, goToNext, toggleFullscreen]);
 
   if (loading) {
     return (
@@ -284,16 +285,12 @@ export default function ExamPresentationPage({ params }: { params: Promise<{ id:
           </div>
 
           {/* Question Image (if any) */}
-          {q.imageUrl && (
-            <div className="flex justify-center p-3 bg-white rounded-2xl shadow-inner max-w-lg mx-auto">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={q.imageUrl}
-                alt={`Hình minh họa câu ${currentIndex + 1}`}
-                className="max-h-72 object-contain"
-              />
-            </div>
-          )}
+          <QuestionFigures
+            imageUrl={q.imageUrl}
+            imageUrls={q.imageUrls}
+            questionNumber={currentIndex + 1}
+            variant="presentation"
+          />
         </div>
 
         {/* Multiple Choice Cards */}

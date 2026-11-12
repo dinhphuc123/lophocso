@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import "katex/dist/katex.min.css";
 import katex from "katex";
 
@@ -9,13 +9,21 @@ interface MathTextProps {
   className?: string;
 }
 
-/** Renders inline/block LaTeX math within a single text segment (no tables). */
-function MathSegment({ text, keyPrefix }: { text: string; keyPrefix: string }) {
+/** Renders inline/block LaTeX math and inline [HINH_ANH:...] figures within a single text segment. */
+function MathSegment({
+  text,
+  keyPrefix,
+  onZoomImage,
+}: {
+  text: string;
+  keyPrefix: string;
+  onZoomImage?: (url: string) => void;
+}) {
   if (!text) return null;
 
   const decoded = text.replace(/&#124;/g, "|");
   const parts: React.ReactNode[] = [];
-  const regex = /\$\$([\s\S]+?)\$\$|\$([^\$\n]+?)\$/g;
+  const regex = /\[HINH_ANH:([^\]]+)\]|\$\$([\s\S]+?)\$\$|\$([^\$\n]+?)\$/g;
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -24,10 +32,30 @@ function MathSegment({ text, keyPrefix }: { text: string; keyPrefix: string }) {
       parts.push(decoded.substring(lastIndex, match.index));
     }
 
-    const blockMath = match[1];
-    const inlineMath = match[2];
+    const inlineImgUrl = match[1];
+    const blockMath = match[2];
+    const inlineMath = match[3];
 
-    if (blockMath) {
+    if (inlineImgUrl) {
+      const cleanUrl = inlineImgUrl.trim();
+      parts.push(
+        <span key={`${keyPrefix}-img-${match.index}`} className="my-1.5 inline-block align-middle">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={cleanUrl}
+            alt="Hình minh họa"
+            onClick={(e) => {
+              if (onZoomImage) {
+                e.stopPropagation();
+                onZoomImage(cleanUrl);
+              }
+            }}
+            title="Bấm để phóng to hình vẽ"
+            className="max-h-52 max-w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white p-1 object-contain cursor-zoom-in hover:ring-2 hover:ring-blue-500/50 transition-all"
+          />
+        </span>
+      );
+    } else if (blockMath) {
       const html = katex.renderToString(blockMath.trim(), {
         displayMode: true,
         throwOnError: false,
@@ -72,14 +100,34 @@ const isSeparatorRow = (cells: string[]) =>
   cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c.trim()));
 
 export function MathText({ content, className = "" }: MathTextProps) {
+  const [zoomedUrl, setZoomedUrl] = useState<string | null>(null);
+
   if (!content) return null;
 
   const normalized = content.replace(/\r\n/g, "\n");
+  const lightbox = zoomedUrl ? (
+    <span
+      onClick={(e) => {
+        e.stopPropagation();
+        setZoomedUrl(null);
+      }}
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 cursor-zoom-out"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={zoomedUrl}
+        alt="Phóng to hình vẽ"
+        className="max-h-[90vh] max-w-[92vw] rounded-2xl bg-white p-3 object-contain shadow-2xl"
+      />
+    </span>
+  ) : null;
+
   // Fast path if there is no Markdown pipe table in content
   if (!normalized.includes("|")) {
     return (
       <span className={className}>
-        <MathSegment text={normalized} keyPrefix="m" />
+        <MathSegment text={normalized} keyPrefix="m" onZoomImage={setZoomedUrl} />
+        {lightbox}
       </span>
     );
   }
@@ -92,7 +140,14 @@ export function MathText({ content, className = "" }: MathTextProps) {
   const flushText = (idx: number) => {
     if (textBuffer.length === 0) return;
     const joined = textBuffer.join("\n");
-    blocks.push(<MathSegment key={`txt-${idx}`} text={joined} keyPrefix={`txt-${idx}`} />);
+    blocks.push(
+      <MathSegment
+        key={`txt-${idx}`}
+        text={joined}
+        keyPrefix={`txt-${idx}`}
+        onZoomImage={setZoomedUrl}
+      />
+    );
     textBuffer = [];
   };
 
@@ -137,7 +192,11 @@ export function MathText({ content, className = "" }: MathTextProps) {
                               : "text-center font-medium"
                           }`}
                         >
-                          <MathSegment text={cell} keyPrefix={`cell-${idx}-${rIdx}-${cIdx}`} />
+                          <MathSegment
+                            text={cell}
+                            keyPrefix={`cell-${idx}-${rIdx}-${cIdx}`}
+                            onZoomImage={setZoomedUrl}
+                          />
                         </CellTag>
                       );
                     })}
@@ -167,5 +226,10 @@ export function MathText({ content, className = "" }: MathTextProps) {
   flushTable(lines.length);
   flushText(lines.length + 1);
 
-  return <span className={className}>{blocks}</span>;
+  return (
+    <span className={className}>
+      {blocks}
+      {lightbox}
+    </span>
+  );
 }

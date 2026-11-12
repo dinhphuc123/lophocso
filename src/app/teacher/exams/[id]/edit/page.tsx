@@ -17,12 +17,23 @@ import {
   FileText,
   AlertCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Image as ImageIcon
 } from "lucide-react";
 import { Exam, Question, MultipleChoiceQuestion, TrueFalseQuestion, ShortAnswerQuestion } from "@/lib/types";
 import { MathText } from "@/components/MathText";
+import { QuestionFigures, getQuestionImageList } from "@/components/QuestionFigures";
 import { SqlFixModal } from "@/components/SqlFixModal";
 import { distributeExamPoints, auditExamQuestions } from "@/lib/item-analysis";
+
+function readImageFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Không thể đọc tệp ảnh"));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function ExamEditPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -142,6 +153,58 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
       next[index] = { ...next[index], points: Math.max(0, Number(points) || 0) };
       return next;
     });
+  };
+
+  const addQuestionImage = async (qIdx: number, file: File) => {
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file);
+      if (!dataUrl) return;
+      setQuestions((prev) => {
+        const next = [...prev];
+        const q = next[qIdx];
+        if (!q) return prev;
+        const current = getQuestionImageList(q.imageUrl, q.imageUrls);
+        const updated = [...current, dataUrl];
+        next[qIdx] = {
+          ...q,
+          imageUrl: updated[0],
+          imageUrls: updated.length > 1 ? updated : undefined,
+        } as Question;
+        return next;
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  const removeQuestionImage = (qIdx: number, imgIdx: number) => {
+    setQuestions((prev) => {
+      const next = [...prev];
+      const q = next[qIdx];
+      if (!q) return prev;
+      const current = getQuestionImageList(q.imageUrl, q.imageUrls);
+      const updated = current.filter((_, i) => i !== imgIdx);
+      next[qIdx] = {
+        ...q,
+        imageUrl: updated[0],
+        imageUrls: updated.length > 1 ? updated : undefined,
+      } as Question;
+      return next;
+    });
+  };
+
+  const handlePasteQuestionImage = async (qIdx: number, e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          await addQuestionImage(qIdx, file);
+        }
+      }
+    }
   };
 
   const handleQuickDistributePoints = (mode: "bgd2025" | "equal10") => {
@@ -637,15 +700,33 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
                   </div>
                 </div>
 
-                {/* Question Text */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-foreground">Nội dung câu hỏi (hỗ trợ $công thức$ LaTeX)</label>
+                {/* Question Text & Figures */}
+                <div className="space-y-2" onPaste={(e) => handlePasteQuestionImage(idx, e)}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-foreground">
+                      Nội dung câu hỏi (hỗ trợ $công thức$ LaTeX, bảng |...| và nhấn Ctrl+V để dán hình vẽ)
+                    </label>
+                    <label className="px-2.5 py-1 rounded-lg border border-border bg-background hover:bg-muted text-foreground text-[11px] font-semibold flex items-center gap-1 cursor-pointer">
+                      <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                      <span>+ Thêm hình vẽ</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) addQuestionImage(idx, f);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
                   <textarea
                     rows={2}
                     value={q.text}
                     onChange={(e) => updateQuestionText(idx, e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-border bg-background text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed font-mono"
-                    placeholder="Nhập nội dung câu hỏi..."
+                    placeholder="Nhập nội dung câu hỏi (hoặc nhấn Ctrl+V để dán ảnh chụp đồ thị/hình vẽ từ Snipping Tool)..."
                   />
                   {showMathPreview && q.text && (
                     <div className="p-2.5 rounded-xl bg-muted/40 border border-border/80 text-xs">
@@ -655,6 +736,12 @@ export default function ExamEditPage({ params }: { params: Promise<{ id: string 
                       <MathText content={q.text} />
                     </div>
                   )}
+                  <QuestionFigures
+                    imageUrl={q.imageUrl}
+                    imageUrls={q.imageUrls}
+                    questionNumber={idx + 1}
+                    onRemoveImage={(imgIdx) => removeQuestionImage(idx, imgIdx)}
+                  />
                 </div>
 
                 {/* Multiple choice options */}

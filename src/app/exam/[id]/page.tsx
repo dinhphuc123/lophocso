@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Clock, CheckCircle2, AlertCircle, ArrowRight, User, Award, Check, X, RotateCcw, Wifi, WifiOff, ShieldAlert } from "lucide-react";
 import { Exam, StudentSubmission } from "@/lib/types";
 import { MathText } from "@/components/MathText";
+import { QuestionFigures } from "@/components/QuestionFigures";
 import { playSfx, launchConfetti } from "@/lib/effects";
 
 export default function StudentExamPage({ params }: { params: Promise<{ id: string }> }) {
@@ -423,6 +424,12 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
                     <MathText content={q.text} />
                   </div>
 
+                  <QuestionFigures
+                    imageUrl={q.imageUrl}
+                    imageUrls={q.imageUrls}
+                    questionNumber={idx + 1}
+                  />
+
                   {/* Multiple Choice details */}
                   {q.type === "multiple_choice" && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -628,16 +635,11 @@ export default function StudentExamPage({ params }: { params: Promise<{ id: stri
               </div>
 
               {/* Question Image (if any) */}
-              {q.imageUrl && (
-                <div className="p-2 rounded-xl bg-card border border-border/80 w-fit my-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={q.imageUrl}
-                    alt={`Hình vẽ câu ${idx + 1}`}
-                    className="max-h-64 max-w-full rounded-lg object-contain bg-white"
-                  />
-                </div>
-              )}
+              <QuestionFigures
+                imageUrl={q.imageUrl}
+                imageUrls={q.imageUrls}
+                questionNumber={idx + 1}
+              />
 
               {/* Multiple Choice options */}
               {q.type === "multiple_choice" && (

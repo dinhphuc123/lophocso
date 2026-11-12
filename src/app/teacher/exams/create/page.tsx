@@ -21,8 +21,18 @@ import {
 import { parseExamText } from "@/lib/parser";
 import { Question, MultipleChoiceQuestion, TrueFalseQuestion, ShortAnswerQuestion } from "@/lib/types";
 import { MathText } from "@/components/MathText";
+import { QuestionFigures, getQuestionImageList } from "@/components/QuestionFigures";
 import { SqlFixModal } from "@/components/SqlFixModal";
 import { distributeExamPoints, auditExamQuestions } from "@/lib/item-analysis";
+
+function readImageFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Không thể đọc tệp ảnh"));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function CreateExamPage() {
   const router = useRouter();
@@ -229,6 +239,58 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
       }
       return next;
     });
+  };
+
+  const handleAddQuestionImage = async (qIdx: number, file: File) => {
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file);
+      if (!dataUrl) return;
+      setParsedQuestions((prev) => {
+        const next = [...prev];
+        const q = next[qIdx];
+        if (!q) return prev;
+        const currentList = getQuestionImageList(q.imageUrl, q.imageUrls);
+        const updated = [...currentList, dataUrl];
+        next[qIdx] = {
+          ...q,
+          imageUrl: updated[0],
+          imageUrls: updated.length > 1 ? updated : undefined,
+        } as Question;
+        return next;
+      });
+    } catch {
+      // ignore invalid file
+    }
+  };
+
+  const handleRemoveQuestionImage = (qIdx: number, imgIdx: number) => {
+    setParsedQuestions((prev) => {
+      const next = [...prev];
+      const q = next[qIdx];
+      if (!q) return prev;
+      const currentList = getQuestionImageList(q.imageUrl, q.imageUrls);
+      const updated = currentList.filter((_, i) => i !== imgIdx);
+      next[qIdx] = {
+        ...q,
+        imageUrl: updated[0],
+        imageUrls: updated.length > 1 ? updated : undefined,
+      } as Question;
+      return next;
+    });
+  };
+
+  const handlePasteClipboardImage = async (qIdx: number, e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          await handleAddQuestionImage(qIdx, file);
+        }
+      }
+    }
   };
 
   const handlePublish = async () => {
@@ -599,6 +661,23 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
                           />
                           <span className="text-blue-600 font-semibold text-[11px]">đ</span>
                         </div>
+                        <label
+                          className="px-2 py-1 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Tải thêm hình vẽ từ máy tính (hoặc bấm Sửa câu rồi nhấn Ctrl+V để dán ảnh từ Snipping Tool)"
+                        >
+                          <ImageIcon className="w-3 h-3 text-blue-600" />
+                          <span>+ Hình</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleAddQuestionImage(idx, f);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
                         <button
                           type="button"
                           onClick={() => setEditingIndex(isEditing ? null : idx)}
@@ -616,10 +695,15 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
 
                     {/* Inline Editor for Question Text & Table */}
                     {isEditing ? (
-                      <div className="space-y-2 p-3 rounded-xl bg-card border border-blue-300 dark:border-blue-800">
-                        <label className="text-[11px] font-bold text-foreground block">
-                          Nội dung đề bài &amp; Bảng số liệu (hỗ trợ $LaTeX$ và bảng Markdown | cột 1 | cột 2 |):
-                        </label>
+                      <div
+                        onPaste={(e) => handlePasteClipboardImage(idx, e)}
+                        className="space-y-2 p-3 rounded-xl bg-card border border-blue-300 dark:border-blue-800"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <label className="text-[11px] font-bold text-foreground">
+                            Nội dung đề bài &amp; Bảng số liệu (hỗ trợ $LaTeX$, bảng | cột 1 | cột 2 |, hoặc nhấn Ctrl+V để dán ảnh trực tiếp):
+                          </label>
+                        </div>
                         <textarea
                           rows={hasTable ? 5 : 3}
                           value={q.text}
@@ -642,21 +726,13 @@ Câu 4. [TL][VD] Có hai chiếc hộp, hộp I có 6 quả bóng màu đỏ và
                       </div>
                     )}
 
-                    {/* Question Image (from docx) */}
-                    {q.imageUrl && (
-                      <div className="p-2 rounded-xl bg-card border border-border/60 w-fit">
-                        <div className="text-[10px] font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
-                          <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
-                          <span>Hình vẽ trích xuất từ file Word:</span>
-                        </div>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={q.imageUrl}
-                          alt={`Hình vẽ câu ${idx + 1}`}
-                          className="max-h-56 max-w-full rounded-lg object-contain bg-white"
-                        />
-                      </div>
-                    )}
+                    {/* Question Figures (supports 1 or multiple images, zoom & delete) */}
+                    <QuestionFigures
+                      imageUrl={q.imageUrl}
+                      imageUrls={q.imageUrls}
+                      questionNumber={idx + 1}
+                      onRemoveImage={(imgIdx) => handleRemoveQuestionImage(idx, imgIdx)}
+                    />
 
                     {/* Multiple Choice Preview & Interactive Answer Selector */}
                     {q.type === "multiple_choice" && (

@@ -1,11 +1,21 @@
 import { Question, MultipleChoiceQuestion, TrueFalseQuestion, ShortAnswerQuestion, EssayQuestion } from "./types";
 
+/** Extract all [HINH_ANH:...] tags from a string and return cleaned text + extracted URLs */
+function extractImagesFromText(s: string): { cleaned: string; urls: string[] } {
+  const urls: string[] = [];
+  for (const m of s.matchAll(/\[HINH_ANH:([^\]]+)\]/g)) {
+    const u = m[1]?.trim();
+    if (u && !urls.includes(u)) urls.push(u);
+  }
+  const cleaned = s.replace(/\[HINH_ANH:[^\]]+\]/g, "").trim();
+  return { cleaned, urls };
+}
+
 export function parseExamText(rawText: string): Question[] {
   // Normalize line breaks
   let text = rawText.replace(/\r\n/g, "\n");
 
   // Strip trailing Appendix / End-of-exam footer (e.g. "PHỤ LỤC KIỂM ĐỊNH...", "---------- HẾT ----------")
-  // so appendix numbered items or notes don't get appended to the last question's explanation or parsed as questions
   const footerMatch = text.match(/(?:^|\n)\s*(?:PHỤ LỤC\b|[-=_*]{3,}\s*HẾT\s*[-=_*]{3,}|\bHẾT\b\s*$)/i);
   if (footerMatch && footerMatch.index !== undefined) {
     text = text.slice(0, footerMatch.index).trimEnd();
@@ -50,15 +60,7 @@ export function parseExamText(rawText: string): Question[] {
     // 0. Strip trailing Section headers ("PHẦN II...", "PHẦN III...", "PHẦN IV...") that belong to the next section
     block = block.replace(/(?:\n\s*)+(?:<u>)?PHẦN\s+(?:I|II|III|IV|V|\d+)\b[\s\S]*$/i, "").trim();
 
-    // 1. Extract embedded image [HINH_ANH:data:image/...]
-    let imageUrl: string | undefined;
-    const imgMatch = block.match(/\[HINH_ANH:([^\]]+)\]/);
-    if (imgMatch) {
-      imageUrl = imgMatch[1];
-      block = block.replace(/\[HINH_ANH:[^\]]+\]/g, "").trim();
-    }
-
-    // 2. Extract Level ([NB], [TH], [VD], [VDC]) from the question header only
+    // 1. Extract Level ([NB], [TH], [VD], [VDC]) from the question header only
     let level: "NB" | "TH" | "VD" | "VDC" | undefined;
     const headerLevelRx = /^(?:(?:<u>)?(?:Câu|Bài)?\s*\d+(?:<\/u>)?[\s.:-]+(?:<\/u>)?\s*)?(?:\[(?:TF|TL)\]\s*)?\[(?:<u>)?(NB|TH|VD|VDC)(?:<\/u>)?\]/i;
     const levelMatch = block.match(headerLevelRx);
@@ -67,7 +69,8 @@ export function parseExamText(rawText: string): Question[] {
       block = block.replace(levelMatch[0], levelMatch[0].replace(/\[(?:<u>)?(NB|TH|VD|VDC)(?:<\/u>)?\]/i, "")).trim();
     }
 
-    // 3. Extract [HDG] (Hướng dẫn giải / Lời giải)
+    // 2. Extract [HDG] (Hướng dẫn giải / Lời giải) BEFORE stripping images from the question stem
+    // so images inside [HDG] remain inside explanation (rendered inline by MathText)!
     let explanation: string | undefined;
     const hdgMatch = block.match(/(?:\[(?:<u>)?HDG(?:<\/u>)?\]|Lời giải|Hướng dẫn giải)[\s.:]*([\s\S]*)$/i);
     if (hdgMatch) {
@@ -85,14 +88,16 @@ export function parseExamText(rawText: string): Question[] {
     // Check if Essay question [TL]
     const isEssay = /\[(?:<u>)?TL(?:<\/u>)?\]/i.test(block);
     if (isEssay) {
-      const qText = stripHeader(block.replace(/\[(?:<u>)?TL(?:<\/u>)?\]/gi, ""));
+      const { cleaned: rawStem, urls: stemImgs } = extractImagesFromText(block.replace(/\[(?:<u>)?TL(?:<\/u>)?\]/gi, ""));
+      const qText = stripHeader(rawStem);
 
       const essayQ: EssayQuestion = {
         id: uniqueId,
         type: "essay",
         text: qText,
         level,
-        imageUrl,
+        imageUrl: stemImgs[0],
+        ...(stemImgs.length > 1 ? { imageUrls: stemImgs } : {}),
         explanation,
         points: 1.0,
       };
@@ -100,16 +105,17 @@ export function parseExamText(rawText: string): Question[] {
       continue;
     }
 
-    // Check if Short Answer question: contains "[[answer||answer2]]" or explicit "Trả lời: <number>"
+    // Check if Short Answer question: contains "[[answer||answer2]]"
     const shortAnsBracketMatch = block.match(/\[\[([\s\S]*?)\]\]/);
     if (shortAnsBracketMatch) {
       const rawAns = shortAnsBracketMatch[1].replace(/<\/?u>/g, "").trim();
       const correctAnswers = rawAns.split("||").map((s) => s.trim()).filter(Boolean);
-      const qText = stripHeader(
+      const { cleaned: rawStem, urls: stemImgs } = extractImagesFromText(
         block
           .replace(/(?:<u>)?Trả lời:(?:<\/u>)?\s*\[\[[\s\S]*?\]\]/i, "")
           .replace(/\[\[[\s\S]*?\]\]/g, "")
       );
+      const qText = stripHeader(rawStem);
 
       const shortQ: ShortAnswerQuestion = {
         id: uniqueId,
@@ -117,7 +123,8 @@ export function parseExamText(rawText: string): Question[] {
         text: qText,
         correctAnswers: correctAnswers.length > 0 ? correctAnswers : [""],
         level,
-        imageUrl,
+        imageUrl: stemImgs[0],
+        ...(stemImgs.length > 1 ? { imageUrls: stemImgs } : {}),
         explanation,
         points: 0.5,
       };
@@ -127,16 +134,15 @@ export function parseExamText(rawText: string): Question[] {
 
     // Check if True/False format: [TF] indicator or 4 sub-questions (a, b, c, d)
     const isTFIndicator = /\[(?:<u>)?TF(?:<\/u>)?\]/i.test(block);
-    // Notice: lowercase [a-d] only to avoid matching A-D options of multiple choice
     const tfRegex = /(?:^|\n)\s*(?:<u>)?([a-d])(?:<\/u>)?[\s.:)]+(?:<\/u>)?\s*(?:\[(?:<u>)?(NB|TH|VD|VDC)(?:<\/u>)?\])?\s*#?([^\n]+)/g;
     const tfMatches = Array.from(block.matchAll(tfRegex));
 
     if (isTFIndicator || tfMatches.length >= 2) {
-      const qText = stripHeader(
-        block
-          .replace(/\[(?:<u>)?TF(?:<\/u>)?\]/gi, "")
-          .split(/(?:^|\n)\s*(?:<u>)?[a-d](?:<\/u>)?[\s.:)]+/i)[0]
-      );
+      const rawStemPart = block
+        .replace(/\[(?:<u>)?TF(?:<\/u>)?\]/gi, "")
+        .split(/(?:^|\n)\s*(?:<u>)?[a-d](?:<\/u>)?[\s.:)]+/i)[0];
+      const { cleaned: cleanStemPart, urls: stemImgs } = extractImagesFromText(rawStemPart);
+      const qText = stripHeader(cleanStemPart);
 
       const subQuestions = tfMatches.map((m) => {
         const letter = m[1].toLowerCase() as "a" | "b" | "c" | "d";
@@ -145,7 +151,6 @@ export function parseExamText(rawText: string): Question[] {
           : undefined;
         let content = m[3].trim().replace(/^#/, "").trim();
 
-        // Check if there is an explicit (Đúng) / (Sai), underline on letter/statement, or in [HDG] ("Ý a) Đúng")
         let isTrue =
           m[0].includes("<u>") ||
           /\(Đúng\)/i.test(content) ||
@@ -176,7 +181,8 @@ export function parseExamText(rawText: string): Question[] {
         text: qText || `Câu ${qNum}`,
         subQuestions,
         level,
-        imageUrl,
+        imageUrl: stemImgs[0],
+        ...(stemImgs.length > 1 ? { imageUrls: stemImgs } : {}),
         explanation,
         points: 1.0,
       };
@@ -185,7 +191,6 @@ export function parseExamText(rawText: string): Question[] {
     }
 
     // Check if Multiple Choice (A. ... B. ... C. ... D. ...)
-    // Supports options separated by whitespace OR glued right after a period/semicolon/formula (e.g. "A. $60$.B. $75$.C. $15$.D. $45$.")
     const mcOptionBoundary = /(?:^|[\s\t\n]+|(?<=[.;$])\s*)(?:<u>)?([A-D])(?:<\/u>)?\s*[.:)]\s*(?:<\/u>)?/g;
     const rawOptPositions: Array<{ letter: "A" | "B" | "C" | "D"; matchStart: number; contentStart: number; rawMarker: string }> = [];
     let om: RegExpExecArray | null;
@@ -199,7 +204,6 @@ export function parseExamText(rawText: string): Question[] {
       });
     }
 
-    // Find a valid option sequence starting with "A" (usually the last A, B, C, D sequence in the block)
     let validOptPositions = rawOptPositions;
     const lastAIndex = rawOptPositions.map((p) => p.letter).lastIndexOf("A");
     if (lastAIndex !== -1 && rawOptPositions.length - lastAIndex >= 2) {
@@ -208,7 +212,8 @@ export function parseExamText(rawText: string): Question[] {
 
     if (validOptPositions.length >= 2 && validOptPositions[0].letter === "A") {
       const firstOptStart = validOptPositions[0].matchStart;
-      const qText = stripHeader(block.slice(0, firstOptStart));
+      const { cleaned: cleanStemPart, urls: stemImgs } = extractImagesFromText(block.slice(0, firstOptStart));
+      const qText = stripHeader(cleanStemPart);
 
       const optionsSlice = validOptPositions.slice(0, 4);
       let underlinedCorrect: "A" | "B" | "C" | "D" | undefined;
@@ -219,6 +224,7 @@ export function parseExamText(rawText: string): Question[] {
         if (pos.rawMarker.includes("<u>") || /<u>/.test(rawOptChunk)) {
           if (!underlinedCorrect) underlinedCorrect = pos.letter;
         }
+        // Keep [HINH_ANH:...] inside option text if an option has its own figure (e.g. 4 graphs A, B, C, D)!
         const optText = rawOptChunk.replace(/<\/?u>/g, "").trim().replace(/[.;]+$/, "").trim();
         return {
           id: pos.letter,
@@ -236,13 +242,12 @@ export function parseExamText(rawText: string): Question[] {
         if (mappedKey === "A" || mappedKey === "B" || mappedKey === "C" || mappedKey === "D") {
           correct = mappedKey;
         } else {
-          // Check inline or inside [HDG] explanation: e.g. "Chọn đáp án B", "Chọn B", "Đáp án: C"
           const searchArea = `${block}\n${explanation ?? ""}`;
           const inlineMatch = searchArea.match(/(?:Chọn\s+đáp\s+án|Chọn\s+phương\s+án|Đáp\s+án\s+đúng\s+là|Đáp\s+án\s+đúng|Đáp\s+án|Chọn)\s*[:.]?\s*([A-D])\b/i);
           if (inlineMatch) {
             correct = inlineMatch[1].toUpperCase() as "A" | "B" | "C" | "D";
           } else {
-            answerKnown = false; // placeholder "A": the teacher must confirm it in the preview
+            answerKnown = false;
           }
         }
       }
@@ -255,7 +260,8 @@ export function parseExamText(rawText: string): Question[] {
         correctAnswer: correct,
         ...(answerKnown ? {} : { answerUnknown: true }),
         level,
-        imageUrl,
+        imageUrl: stemImgs[0],
+        ...(stemImgs.length > 1 ? { imageUrls: stemImgs } : {}),
         explanation,
         points: 0.25,
       };
@@ -264,11 +270,11 @@ export function parseExamText(rawText: string): Question[] {
     }
 
     // Fallback Short Answer Question
-    let cleanQText = stripHeader(block);
-    const searchShortArea = `${block}\n${explanation ?? ""}`;
+    const { cleaned: rawFallbackStem, urls: stemImgs } = extractImagesFromText(block);
+    let cleanQText = stripHeader(rawFallbackStem);
+    const searchShortArea = `${rawFallbackStem}\n${explanation ?? ""}`;
     const shortAnsMatch = searchShortArea.match(/(?:Trả\s+lời|Đáp\s+án|Kết\s+quả|Vậy\s+[^\n=:]*bằng)[\s.:=]+([+-]?\d+(?:[.,]\d+)?)/i);
     let correctAnswers = shortAnsMatch ? [shortAnsMatch[1].trim()] : [""];
-    // If answer has comma decimal (e.g. 1,79), also accept dot decimal (1.79)
     if (correctAnswers[0] && /^\d+,\d+$/.test(correctAnswers[0])) {
       correctAnswers = [correctAnswers[0], correctAnswers[0].replace(",", ".")];
     }
@@ -280,7 +286,8 @@ export function parseExamText(rawText: string): Question[] {
       text: cleanQText,
       correctAnswers,
       level,
-      imageUrl,
+      imageUrl: stemImgs[0],
+      ...(stemImgs.length > 1 ? { imageUrls: stemImgs } : {}),
       explanation,
       points: 0.5,
     };

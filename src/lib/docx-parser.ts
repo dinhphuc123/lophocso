@@ -27,6 +27,7 @@ function sniffImageExt(b: Uint8Array): string | null {
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpg";
   if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return "gif";
   if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45) return "webp";
+  if (b[0] === 0x42 && b[1] === 0x4d) return "bmp";
   return null;
 }
 
@@ -54,6 +55,29 @@ function hasColorOrHighlight(rPrXml: string): boolean {
     }
   }
   return false;
+}
+
+/** Collect all image URLs referenced by a Question (primary imageUrl, imageUrls array, and inline [HINH_ANH:...] in text/options/explanation). */
+function collectQuestionImageUrls(q: Question): string[] {
+  const urls = new Set<string>();
+  if (q.imageUrl) urls.add(q.imageUrl);
+  if (q.imageUrls) q.imageUrls.forEach((u) => urls.add(u));
+
+  const scanText = (s?: string) => {
+    if (!s) return;
+    for (const m of s.matchAll(/\[HINH_ANH:([^\]]+)\]/g)) {
+      if (m[1]) urls.add(m[1].trim());
+    }
+  };
+
+  scanText(q.text);
+  scanText(q.explanation);
+  if (q.type === "multiple_choice") {
+    q.options.forEach((o) => scanText(o.text));
+  } else if (q.type === "true_false") {
+    q.subQuestions.forEach((s) => scanText(s.text));
+  }
+  return Array.from(urls);
 }
 
 export async function parseDocxBuffer(
@@ -113,13 +137,15 @@ export async function parseDocxBuffer(
 
   const docXml = await docFile.async("text");
 
-  async function parseParagraph(pXml: string): Promise<{ text: string; imgUrl?: string }> {
+  async function parseParagraph(pXml: string): Promise<{ text: string; imgUrls: string[] }> {
     let pText = "";
-    let imgUrl: string | undefined;
-    const elemRegex = /<(m:oMathPara|m:oMath|w:r)(?:\s[^>]*)?>[\s\S]*?<\/\1>/g;
+    const imgUrls: string[] = [];
+    // Strip <mc:Fallback>...</mc:Fallback> so dual DrawingML + VML fallback blocks don't extract the same image twice
+    const cleanedPXml = pXml.replace(/<mc:Fallback\b[^>]*>[\s\S]*?<\/mc:Fallback>/g, "");
+    const elemRegex = /<(m:oMathPara|m:oMath|w:r|w:pict)(?:\s[^>]*)?>[\s\S]*?<\/\1>/g;
     let m: RegExpExecArray | null;
 
-    while ((m = elemRegex.exec(pXml)) !== null) {
+    while ((m = elemRegex.exec(cleanedPXml)) !== null) {
       const tag = m[1];
       const content = m[0];
 
@@ -129,8 +155,19 @@ export async function parseDocxBuffer(
         continue;
       }
 
-      const blip = content.match(/r:embed="([^"]+)"/);
-      if (blip) imgUrl = (await imageFor(blip[1])) ?? imgUrl;
+      // Match both DrawingML (<a:blip r:embed="rId..."/>) and legacy VML (<v:imagedata r:id="rId..." o:relid="rId..."/>)
+      const rIds = new Set<string>();
+      for (const bm of content.matchAll(/\br:embed="([^"]+)"/g)) rIds.add(bm[1]);
+      for (const vm of content.matchAll(/<v:imagedata\b[^>]*\b(?:r:id|o:relid)="([^"]+)"/g)) rIds.add(vm[1]);
+
+      for (const rId of rIds) {
+        const url = await imageFor(rId);
+        if (url && !imgUrls.includes(url)) {
+          imgUrls.push(url);
+        }
+      }
+
+      if (tag === "w:pict") continue;
 
       const rPr = content.match(/<w:rPr(?:\s[^>]*)?>[\s\S]*?<\/w:rPr>/)?.[0] ?? "";
       let runText = "";
@@ -145,7 +182,7 @@ export async function parseDocxBuffer(
       const underlined = hasUnderline || (isOptionMarkerRun && hasColorOrHighlight(rPr));
       if (runText) pText += underlined ? `<u>${runText}</u>` : runText;
     }
-    return { text: pText.trim(), imgUrl };
+    return { text: pText.trim(), imgUrls };
   }
 
   // 3. Process top-level blocks in document order (<w:tbl> and <w:p>)
@@ -153,7 +190,7 @@ export async function parseDocxBuffer(
   // - Option layout table (2x2 or 1x4 where cells start with A., B., C., D.) -> flatten to paragraphs
   // - Side-by-side stem + figure table (1 row, 2 cols where one cell has an image or question stem) -> flatten
   // - Data / statistical / variation table (e.g. grouped frequency table) -> emit Markdown pipe table
-  const lines: Array<{ text: string; imgUrl?: string }> = [];
+  const lines: Array<{ text: string; imgUrls: string[] }> = [];
   let tableCount = 0;
 
   const blockRegex = /<w:tbl(?:\s[^>]*)?>[\s\S]*?<\/w:tbl>|<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g;
@@ -165,17 +202,19 @@ export async function parseDocxBuffer(
     }
 
     // Parse <w:tbl>
-    const rows: Array<Array<{ text: string; imgUrl?: string }>> = [];
+    const rows: Array<Array<{ text: string; imgUrls: string[] }>> = [];
     for (const trMatch of blockXml.matchAll(/<w:tr(?:\s[^>]*)?>[\s\S]*?<\/w:tr>/g)) {
-      const rowCells: Array<{ text: string; imgUrl?: string }> = [];
+      const rowCells: Array<{ text: string; imgUrls: string[] }> = [];
       for (const tcMatch of trMatch[0].matchAll(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g)) {
         const tcXml = tcMatch[0];
         const cellTexts: string[] = [];
-        let cellImg: string | undefined;
+        const cellImgs: string[] = [];
         for (const pMatch of tcXml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)) {
           const parsedP = await parseParagraph(pMatch[0]);
           if (parsedP.text) cellTexts.push(parsedP.text);
-          if (parsedP.imgUrl) cellImg = parsedP.imgUrl;
+          for (const u of parsedP.imgUrls) {
+            if (!cellImgs.includes(u)) cellImgs.push(u);
+          }
         }
         // Check horizontal merge (gridSpan) so multi-column headers stay aligned
         const spanMatch = tcXml.match(/<w:gridSpan\s[^>]*w:val="(\d+)"/);
@@ -183,13 +222,13 @@ export async function parseDocxBuffer(
 
         rowCells.push({
           text: cellTexts.join(" ").replace(/\r?\n/g, " ").trim(),
-          imgUrl: cellImg,
+          imgUrls: cellImgs,
         });
         for (let s = 1; s < span; s++) {
-          rowCells.push({ text: "" });
+          rowCells.push({ text: "", imgUrls: [] });
         }
       }
-      if (rowCells.some((c) => c.text || c.imgUrl)) {
+      if (rowCells.some((c) => c.text || c.imgUrls.length > 0)) {
         rows.push(rowCells);
       }
     }
@@ -197,10 +236,10 @@ export async function parseDocxBuffer(
     if (rows.length === 0) continue;
 
     const allCells = rows.flat();
-    const nonEmptyCells = allCells.filter((c) => c.text || c.imgUrl);
+    const nonEmptyCells = allCells.filter((c) => c.text || c.imgUrls.length > 0);
 
-    // Case A: Table contains an image (e.g. 2-column stem + figure layout)
-    const hasImage = allCells.some((c) => c.imgUrl);
+    // Case A: Table contains an image (e.g. 2-column stem + figure layout or option figures)
+    const hasImage = allCells.some((c) => c.imgUrls.length > 0);
     // Case B: Option grid table (every non-empty cell starts with A. / B. / C. / D.)
     const optionCellCount = nonEmptyCells.filter((c) =>
       /^(?:<u>)?[A-D](?:<\/u>)?[\s.:)]+/i.test(c.text.trim())
@@ -211,7 +250,7 @@ export async function parseDocxBuffer(
 
     if (hasImage || isOptionGrid || isQuestionWrapper) {
       for (const cell of allCells) {
-        if (cell.text || cell.imgUrl) {
+        if (cell.text || cell.imgUrls.length > 0) {
           lines.push(cell);
         }
       }
@@ -227,7 +266,6 @@ export async function parseDocxBuffer(
     rows.forEach((r, rIdx) => {
       const padded = Array.from({ length: colCount }, (_, cIdx) => {
         const rawCell = r[cIdx]?.text ?? "";
-        // Escape literal pipe characters outside math or replace with \mid if needed
         return rawCell.replace(/\|/g, "&#124;").trim();
       });
       mdRows.push(`| ${padded.join(" | ")} |`);
@@ -236,25 +274,33 @@ export async function parseDocxBuffer(
       }
     });
 
-    lines.push({ text: mdRows.join("\n") });
+    lines.push({ text: mdRows.join("\n"), imgUrls: [] });
   }
 
-  // 4. an image-only paragraph belongs to the line before it (the "Câu X." heading)
+  // 4. an image-only paragraph belongs to the line before it (the "Câu X." heading or option/HDG line)
   const out: string[] = [];
-  for (const { text, imgUrl } of lines) {
-    if (!text && imgUrl) {
-      if (out.length) out[out.length - 1] += ` [HINH_ANH:${imgUrl}]`;
-      else out.push(`[HINH_ANH:${imgUrl}]`);
+  for (const { text, imgUrls } of lines) {
+    const tags = imgUrls.map((u) => `[HINH_ANH:${u}]`).join(" ");
+    if (!text && tags) {
+      if (out.length) out[out.length - 1] += ` ${tags}`;
+      else out.push(tags);
     } else if (text) {
-      out.push(imgUrl ? `${text} [HINH_ANH:${imgUrl}]` : text);
+      out.push(tags ? `${text} ${tags}` : text);
     }
   }
 
   const rawText = out.join("\n");
   const questions = parseExamText(rawText);
 
+  // Collect all used image URLs across questions (stem, options, subQuestions, explanation)
+  const used = new Set<string>();
+  for (const q of questions) {
+    for (const u of collectQuestionImageUrls(q)) {
+      used.add(u);
+    }
+  }
+
   // drop files this call wrote that no question ended up using (e.g. the logo in the instructions header)
-  const used = new Set(questions.map((q) => q.imageUrl).filter(Boolean));
   for (const file of createdNow) {
     if (!used.has(`/uploads/${path.basename(file)}`)) fs.rmSync(file, { force: true });
   }
@@ -262,7 +308,7 @@ export async function parseDocxBuffer(
   return {
     rawText,
     questions,
-    imageCount: questions.filter((q) => q.imageUrl).length,
+    imageCount: used.size,
     tableCount,
   };
 }
