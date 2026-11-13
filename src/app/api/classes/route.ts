@@ -49,11 +49,17 @@ export async function GET(req: Request) {
             const name = String(c.name || "");
             const local = localMap.get(id) || localByName.get(name.toLowerCase());
             const supaStudents = Array.isArray(c.students) && c.students.length > 0 ? (c.students as string[]) : null;
+            const supaGroups = Array.isArray(c.groups) ? (c.groups as ClassRoom["groups"]) : undefined;
+            const supaLogs = Array.isArray(c.participation_logs) ? (c.participation_logs as ClassRoom["participationLogs"]) : undefined;
+            const supaConfig = c.participation_config && typeof c.participation_config === "object" ? (c.participation_config as ClassRoom["participationConfig"]) : undefined;
             return {
               id,
               name,
               grade: c.grade ? String(c.grade) : undefined,
               students: supaStudents || local?.students || [],
+              groups: supaGroups || local?.groups || [],
+              participationLogs: supaLogs || local?.participationLogs || [],
+              participationConfig: supaConfig || local?.participationConfig,
             };
           });
         }
@@ -115,11 +121,17 @@ export async function GET(req: Request) {
           const name = String(row.name || "");
           const local = localMap.get(id) || localByName.get(name.toLowerCase());
           const supaStudents = Array.isArray(row.students) && row.students.length > 0 ? (row.students as string[]) : null;
+          const supaGroups = Array.isArray(row.groups) ? (row.groups as ClassRoom["groups"]) : undefined;
+          const supaLogs = Array.isArray(row.participation_logs) ? (row.participation_logs as ClassRoom["participationLogs"]) : undefined;
+          const supaConfig = row.participation_config && typeof row.participation_config === "object" ? (row.participation_config as ClassRoom["participationConfig"]) : undefined;
           return {
             id,
             name,
             grade: row.grade ? String(row.grade) : undefined,
             students: supaStudents || local?.students || [],
+            groups: supaGroups || local?.groups || [],
+            participationLogs: supaLogs || local?.participationLogs || [],
+            participationConfig: supaConfig || local?.participationConfig,
           };
         });
 
@@ -148,10 +160,27 @@ export async function POST(req: Request) {
   if (!name) return NextResponse.json({ success: false, error: "Tên lớp không được để trống" }, { status: 400 });
 
   const id = typeof body.id === "string" && body.id ? body.id : `lop-${Date.now().toString(36)}`;
-  const grade = typeof body.grade === "string" ? body.grade : "12";
-  const students = parseStudents(body.students);
+  const existingLocal = getClasses().find((c) => c.id === id || c.name.toLowerCase() === name.toLowerCase());
+  const grade = typeof body.grade === "string" ? body.grade : existingLocal?.grade || "12";
+  const students = body.students !== undefined ? parseStudents(body.students) : existingLocal?.students || [];
+  const groups = Array.isArray(body.groups) ? body.groups : existingLocal?.groups || [];
+  const participationLogs = Array.isArray(body.participationLogs)
+    ? body.participationLogs
+    : existingLocal?.participationLogs || [];
+  const participationConfig =
+    body.participationConfig && typeof body.participationConfig === "object"
+      ? body.participationConfig
+      : existingLocal?.participationConfig;
 
-  const newClass: ClassRoom = { id, name, grade, students };
+  const newClass: ClassRoom = {
+    id,
+    name,
+    grade,
+    students,
+    groups,
+    participationLogs,
+    participationConfig,
+  };
 
   // Always save locally first so the class is never lost
   saveClass(newClass);

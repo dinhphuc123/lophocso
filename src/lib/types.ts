@@ -101,11 +101,48 @@ export interface Attempt {
   submitted: boolean;
 }
 
+export interface ClassGroup {
+  id: string;
+  name: string;
+  color?: string;
+  leader?: string;
+  members: string[];
+}
+
+export type ActivityCategory = "speech" | "group_work" | "presentation" | "bonus_other";
+
+export interface ParticipationLog {
+  id: string;
+  classId: string;
+  studentName: string;
+  category: ActivityCategory;
+  stars: number;
+  groupId?: string;
+  groupName?: string;
+  isPresenter?: boolean;
+  note?: string;
+  createdAt: string;
+}
+
+export interface ParticipationConfig {
+  starsPerPointRatio: number; // default: 1 star = 0.25 bonus points
+  maxBonusPerExam: number;    // default: max +2.0 bonus points applied per regular exam (capped at 10.0)
+  standaloneColumnStars: number; // default: 20 stars = 10.0 standalone ĐGTX score
+  targetExamId?: string;      // specific exam ID or "auto" (distribute across exams with overflow rollover)
+  speechDefaultStars: number; // default: 1
+  groupWorkDefaultStars: number; // default: 1
+  presentationMemberStars: number; // default: 1
+  presentationSpeakerStars: number; // default: 2
+}
+
 export interface ClassRoom {
   id: string;
   name: string;
   grade?: string;
   students: string[];
+  groups?: ClassGroup[];
+  participationLogs?: ParticipationLog[];
+  participationConfig?: ParticipationConfig;
 }
 
 export interface StudentSubmission {
